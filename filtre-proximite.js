@@ -457,7 +457,10 @@
     // INSERTION DANS LE FORMULAIRE
     // ----------------------------------------------------------
 
-    formulaire.prepend(selecteurMode);
+formulaire.insertAdjacentElement(
+  "beforebegin",
+  selecteurMode
+);
 
     if (blocRegion) {
       blocRegion.insertAdjacentElement(
