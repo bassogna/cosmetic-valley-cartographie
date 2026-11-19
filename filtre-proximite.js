@@ -493,11 +493,7 @@
       ? "block"
       : "none";
 
-    boutonsNatifs.forEach(item => {
-      item.element.style.display = proximite
-        ? "none"
-        : item.display;
-    });
+   
 
     if (!proximite) {
       ++requeteCourante;
