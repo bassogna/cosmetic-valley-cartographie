@@ -400,11 +400,7 @@
           📍 Autour de moi
         </button>
 
-        <button type="button"
-                id="cv-prox-search"
-                class="cv-prox-btn cv-prox-primary">
-          🔍 Rechercher
-        </button>
+       
 
         <button type="button"
                 id="cv-prox-reset"
