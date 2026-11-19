@@ -1794,13 +1794,18 @@ function personnaliserPlaceholders() {
 
     if (!conteneur) return;
 
-    const placeholder = conteneur.querySelector(
-      '[class*="placeholder"]'
-    );
+    const elements = conteneur.querySelectorAll("div");
 
-    if (placeholder) {
-      placeholder.textContent = champ.texte;
-    }
+    elements.forEach(element => {
+
+      if (
+        element.children.length === 0 &&
+        element.textContent.trim() === "Select..."
+      ) {
+        element.textContent = champ.texte;
+      }
+
+    });
 
   });
 
