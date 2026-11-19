@@ -1637,6 +1637,7 @@
       formulaire = nouveauFormulaire;
 
       ui = creerInterface();
+      personnaliserPlaceholders();
 
       const etat = lireEtat();
 
@@ -1717,7 +1718,7 @@
       ajouterStyles();
 
       ui = creerInterface();
-
+      personnaliserPlaceholders();
       brancherEvenements();
 
       const etat = lireEtat();
