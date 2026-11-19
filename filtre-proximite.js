@@ -1771,41 +1771,36 @@
   }
 function personnaliserPlaceholders() {
 
-  const champs = [
-    {
-      name: "company_dpt_region_level_1",
-      texte: "Choisissez une région"
-    },
-    {
-      name: "company_dpt_region_level_2",
-      texte: "Choisissez un département"
-    }
+  const formulaire = trouverFormulaire();
+
+  if (!formulaire) return;
+
+  const groupe = formulaire.querySelector(
+    ".hierarchical-guest-fields-select"
+  );
+
+  if (!groupe) return;
+
+  const colonnes = [
+    ...groupe.querySelectorAll(":scope > .col-md-4")
   ];
 
-  champs.forEach(champ => {
+  const textes = [
+    "Choisissez une région",
+    "Choisissez un département"
+  ];
 
-    const input = document.querySelector(
-      `input[name*="${champ.name}"]`
+  colonnes.slice(0, 2).forEach((colonne, index) => {
+
+    const placeholder = colonne.querySelector(
+      '[class*="placeholder"]'
     );
 
-    if (!input) return;
-
-    const conteneur = input.closest(".react-select");
-
-    if (!conteneur) return;
-
-    const elements = conteneur.querySelectorAll("div");
-
-    elements.forEach(element => {
-
-      if (
-        element.children.length === 0 &&
-        element.textContent.trim() === "Select..."
-      ) {
-        element.textContent = champ.texte;
-      }
-
-    });
+    if (placeholder && !placeholder.textContent.trim().match(
+      /choisissez une/i
+    )) {
+      placeholder.textContent = textes[index];
+    }
 
   });
 
