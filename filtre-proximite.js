@@ -1,21 +1,14 @@
 (function () {
   "use strict";
 
-  // ============================================================
-  // CONFIGURATION
-  // ============================================================
-
   const CONFIG = {
     dataUrl:
       "https://bassogna.github.io/cosmetic-valley-cartographie/cosmetic_valley_adherents_carte.json",
-
     prefix: "guests_list_916095",
     pageParam: "guests_list_916095_page",
-
     maxPages: 50,
     concurrence: 4,
     pageSize: 20,
-
     stockage: "cv_proximite_v9"
   };
 
@@ -26,23 +19,17 @@
 
   let formulaire = null;
   let ui = null;
-
   let mode = "classique";
   let position = null;
   let resultats = [];
   let pageCourante = 1;
-
   let rechercheEnCours = false;
   let requeteCourante = 0;
-
   let blocRegion = null;
   let affichageRegion = "";
-
   let conteneurNatif = null;
   let affichageNatif = "";
-
   let cacheAdherents = null;
-
   let minuterieObservation = null;
   let initialisationEnCours = false;
 
@@ -63,15 +50,11 @@
   function slugDepuisUrl(value) {
     try {
       const url = new URL(value, location.origin);
-
-      const parties = url.pathname
-        .split("/")
-        .filter(Boolean);
+      const parties = url.pathname.split("/").filter(Boolean);
 
       return decodeURIComponent(
         parties[parties.length - 1] || ""
       ).toLowerCase();
-
     } catch {
       return "";
     }
@@ -79,7 +62,6 @@
 
   function distanceKm(lat1, lon1, lat2, lon2) {
     const rad = x => x * Math.PI / 180;
-
     const dLat = rad(lat2 - lat1);
     const dLon = rad(lon2 - lon1);
 
@@ -116,12 +98,11 @@
       f.querySelector(
         '[name="' + CONFIG.prefix + '_q"]'
       )
-    );
+    ) || null;
   }
 
   function trouverConteneur(doc) {
     const premiere = doc.querySelector(".guest-item");
-
     if (!premiere) return null;
 
     let parent = premiere.parentElement;
@@ -131,10 +112,7 @@
         e.matches(".guest-item")
       );
 
-      if (directs.length > 1) {
-        return parent;
-      }
-
+      if (directs.length > 1) return parent;
       parent = parent.parentElement;
     }
 
@@ -142,7 +120,44 @@
   }
 
   // ============================================================
-  // CSS
+  // PLACEHOLDERS REGION / DEPARTEMENT
+  // ============================================================
+
+  function personnaliserPlaceholders() {
+    const form = trouverFormulaire();
+    if (!form) return;
+
+    const groupe = form.querySelector(
+      ".hierarchical-guest-fields-select"
+    );
+
+    if (!groupe) return;
+
+    const colonnes = [
+      ...groupe.querySelectorAll(":scope > .col-md-4")
+    ];
+
+    const textes = [
+      "Choisissez une région",
+      "Choisissez un département"
+    ];
+
+    colonnes.slice(0, 2).forEach((colonne, index) => {
+      const placeholder = colonne.querySelector(
+        '[class*="placeholder"], [class*="Placeholder"]'
+      );
+
+      if (
+        placeholder &&
+        placeholder.textContent.trim() !== textes[index]
+      ) {
+        placeholder.textContent = textes[index];
+      }
+    });
+  }
+
+  // ============================================================
+  // STYLES
   // ============================================================
 
   function ajouterStyles() {
@@ -154,9 +169,6 @@
     style.id = "cv-proximite-styles";
 
     style.textContent = `
-
-      /* MODES */
-
       #cv-mode-recherche {
         margin: 15px 0 20px;
         padding: 16px 20px;
@@ -189,8 +201,6 @@
       .cv-mode-options input {
         accent-color: #70358d;
       }
-
-      /* PROXIMITE */
 
       #cv-proximite {
         display: none;
@@ -259,8 +269,6 @@
         cursor: wait;
       }
 
-      /* PROGRESSION */
-
       #cv-prox-progress {
         display: none;
         margin-top: 18px;
@@ -292,8 +300,6 @@
         font-size: 14px;
         line-height: 1.5;
       }
-
-      /* RESULTATS */
 
       #cv-prox-results {
         width: 100%;
@@ -342,8 +348,6 @@
         font-weight: bold;
       }
 
-      /* PAGINATION GPS */
-
       #cv-prox-pagination {
         display: flex;
         justify-content: center;
@@ -385,8 +389,6 @@
         background: #70358d;
         color: white;
       }
-
-      /* PAGINATION NATIVE */
 
       body.cv-proximite-active
       ul:has(a[href*="guests_list_916095_page="]):not(#cv-prox-pagination),
@@ -445,15 +447,12 @@
 
     affichageRegion = blocRegion?.style.display || "";
 
-    // Sélecteur des modes
-
     let selecteurMode = document.getElementById(
       "cv-mode-recherche"
     );
 
     if (!selecteurMode) {
       selecteurMode = document.createElement("div");
-
       selecteurMode.id = "cv-mode-recherche";
 
       selecteurMode.innerHTML = `
@@ -480,23 +479,18 @@
       `;
     }
 
-    // Bloc proximité
-
     let bloc = document.getElementById("cv-proximite");
 
     if (!bloc) {
       bloc = document.createElement("div");
-
       bloc.id = "cv-proximite";
 
       bloc.innerHTML = `
         <div class="cv-prox-fields">
-
           <div class="cv-prox-field">
             <label for="cv-prox-ville">
               Ville ou code postal
             </label>
-
             <input
               id="cv-prox-ville"
               type="text"
@@ -508,7 +502,6 @@
             <label for="cv-prox-rayon">
               Rayon de recherche
             </label>
-
             <select id="cv-prox-rayon">
               <option value="10">10 km</option>
               <option value="25">25 km</option>
@@ -517,47 +510,36 @@
               <option value="200">200 km</option>
             </select>
           </div>
-
         </div>
 
         <div class="cv-prox-buttons">
-
-          <button
-            type="button"
-            id="cv-prox-geoloc"
-            class="cv-prox-btn cv-prox-location">
+          <button type="button"
+                  id="cv-prox-geoloc"
+                  class="cv-prox-btn cv-prox-location">
             📍 Autour de moi
           </button>
 
-          <button
-            type="button"
-            id="cv-prox-reset"
-            class="cv-prox-btn cv-prox-reset">
+          <button type="button"
+                  id="cv-prox-reset"
+                  class="cv-prox-btn cv-prox-reset">
             Réinitialiser
           </button>
-
         </div>
 
         <div id="cv-prox-progress">
           <div class="cv-prox-progress-track">
             <div id="cv-prox-progress-bar"></div>
           </div>
-
           <div id="cv-prox-progress-text"></div>
         </div>
 
-        <div
-          id="cv-prox-status"
-          role="status"
-          aria-live="polite">
-        </div>
+        <div id="cv-prox-status"
+             role="status"
+             aria-live="polite"></div>
       `;
     }
 
-    // Replacer l'interface si React l'a supprimée
-    // ou si le formulaire a été reconstruit.
-
-    if (selecteurMode.previousElementSibling !== formulaire) {
+    if (selecteurMode.nextElementSibling !== formulaire) {
       formulaire.insertAdjacentElement(
         "beforebegin",
         selecteurMode
@@ -565,10 +547,7 @@
     }
 
     if (blocRegion) {
-      blocRegion.insertAdjacentElement(
-        "afterend",
-        bloc
-      );
+      blocRegion.insertAdjacentElement("afterend", bloc);
     } else {
       formulaire.appendChild(bloc);
     }
@@ -576,24 +555,16 @@
     return {
       mode: selecteurMode,
       bloc,
-
       ville: bloc.querySelector("#cv-prox-ville"),
       rayon: bloc.querySelector("#cv-prox-rayon"),
-
       geoloc: bloc.querySelector("#cv-prox-geoloc"),
       reset: bloc.querySelector("#cv-prox-reset"),
-
       status: bloc.querySelector("#cv-prox-status"),
-
       progress: bloc.querySelector("#cv-prox-progress"),
       progressBar: bloc.querySelector("#cv-prox-progress-bar"),
       progressText: bloc.querySelector("#cv-prox-progress-text")
     };
   }
-
-  // ============================================================
-  // STATUT ET PROGRESSION
-  // ============================================================
 
   function statut(message, erreur = false) {
     if (!ui?.status) return;
@@ -614,7 +585,6 @@
     );
 
     ui.progressBar.style.width = valeur + "%";
-
     ui.progressText.textContent =
       message + " (" + Math.round(valeur) + " %)";
   }
@@ -772,7 +742,6 @@
           latitude: p.coords.latitude,
           longitude: p.coords.longitude
         }),
-
         erreur => {
           const messages = {
             1: "Autorisation de localisation refusée.",
@@ -785,7 +754,6 @@
             "Impossible d'obtenir votre position."
           ));
         },
-
         {
           enableHighAccuracy: false,
           timeout: 15000,
@@ -842,7 +810,6 @@
     });
 
     const commune = exacte || data.features[0];
-
     const p = commune.properties || {};
     const coordinates = commune.geometry?.coordinates;
 
@@ -887,7 +854,6 @@
         ville,
         cp ? "(" + cp + ")" : ""
       ].filter(Boolean).join(" ");
-
     } catch {
       return "";
     }
@@ -912,7 +878,6 @@
     }
 
     const json = await response.json();
-
     const source = Array.isArray(json)
       ? json
       : json.adherents;
@@ -1020,14 +985,11 @@
     if (!response.ok) {
       throw new Error(
         "Erreur Eventmaker page " +
-        numero +
-        " : HTTP " +
-        response.status
+        numero + " : HTTP " + response.status
       );
     }
 
     const html = await response.text();
-
     const doc = new DOMParser().parseFromString(
       html,
       "text/html"
@@ -1035,9 +997,7 @@
 
     return {
       doc,
-      cartes: [
-        ...doc.querySelectorAll(".guest-item")
-      ]
+      cartes: [...doc.querySelectorAll(".guest-item")]
     };
   }
 
@@ -1180,12 +1140,7 @@
       img.removeAttribute("data-srcset");
 
       img.loading = "eager";
-
-      img.classList.remove(
-        "lazyload",
-        "lazyloading"
-      );
-
+      img.classList.remove("lazyload", "lazyloading");
       img.classList.add("lazyloaded");
 
       img.style.visibility = "visible";
@@ -1275,12 +1230,10 @@
 
     page.forEach(item => {
       const carte = item.carte.cloneNode(true);
-
       restaurerImages(carte);
 
       const badge = document.createElement("div");
       badge.className = "cv-prox-distance";
-
       badge.textContent =
         "📍 " + item.distance.toFixed(1) + " km";
 
@@ -1289,7 +1242,6 @@
       );
 
       if (lien) lien.appendChild(badge);
-
       grille.appendChild(carte);
     });
 
@@ -1299,7 +1251,6 @@
       const vide = document.createElement("p");
       vide.textContent =
         "Aucune entreprise trouvée dans ce rayon.";
-
       conteneur.appendChild(vide);
     }
 
@@ -1378,7 +1329,6 @@
     if (rechercheEnCours) return;
 
     verrouiller(true);
-
     const numeroRequete = ++requeteCourante;
 
     try {
@@ -1389,10 +1339,7 @@
 
       const adherents = await chargerAdherents();
       const filtres = obtenirParametresNatifs();
-
-      const cartes = await chargerToutesLesCartes(
-        filtres
-      );
+      const cartes = await chargerToutesLesCartes(filtres);
 
       progression(90, "Calcul des distances");
 
@@ -1425,12 +1372,9 @@
       }
 
       progression(100, "Recherche terminée");
-
       afficherResultats();
 
-      setTimeout(() => {
-        masquerProgression();
-      }, 700);
+      setTimeout(masquerProgression, 700);
 
     } catch (erreur) {
       console.error(
@@ -1451,7 +1395,6 @@
 
     try {
       const valeur = ui.ville.value.trim();
-
       let centre;
 
       if (
@@ -1459,10 +1402,8 @@
         valeur === position.libelle
       ) {
         centre = position;
-
       } else {
         statut("Recherche de la commune...");
-
         centre = await geocoderVille(valeur);
 
         centre.libelle = [
@@ -1483,14 +1424,10 @@
   }
 
   // ============================================================
-  // EVENEMENTS DELEGUES
+  // EVENEMENTS
   // ============================================================
 
   function brancherEvenements() {
-
-    // Écoute au niveau du document pour survivre
-    // à la reconstruction du formulaire React.
-
     document.addEventListener("change", e => {
       if (
         e.target.matches(
@@ -1506,17 +1443,12 @@
 
       if (geoloc) {
         e.preventDefault();
-
         if (rechercheEnCours) return;
 
         try {
           statut("Localisation en cours...");
-
-          const centre =
-            await obtenirPositionNavigateur();
-
-          const ville =
-            await identifierVille(centre);
+          const centre = await obtenirPositionNavigateur();
+          const ville = await identifierVille(centre);
 
           centre.libelle = ville ||
             "Ma position actuelle (" +
@@ -1524,7 +1456,6 @@
             centre.longitude.toFixed(4) + ")";
 
           ui.ville.value = centre.libelle;
-
           await rechercher(centre);
 
         } catch (erreur) {
@@ -1538,7 +1469,6 @@
 
       if (reset) {
         e.preventDefault();
-
         if (rechercheEnCours) return;
 
         position = null;
@@ -1576,12 +1506,10 @@
         if (mode !== "proximite") return;
 
         const cible = trouverFormulaire();
-
         if (!cible || e.target !== cible) return;
 
         e.preventDefault();
         e.stopImmediatePropagation();
-
         lancerRechercheProximite();
       },
       true
@@ -1596,8 +1524,11 @@
     if (initialisationEnCours) return;
 
     const nouveauFormulaire = trouverFormulaire();
-
     if (!nouveauFormulaire) return;
+
+    // Toujours actualiser les placeholders, même si
+    // React n'a pas remplacé le formulaire entier.
+    personnaliserPlaceholders();
 
     const selecteur = document.getElementById(
       "cv-mode-recherche"
@@ -1620,12 +1551,8 @@
     initialisationEnCours = true;
 
     try {
-      // Invalider les résultats d'une recherche précédente
-      // si Eventmaker a reconstruit les fiches.
-
       if (formulaireChange) {
         ++requeteCourante;
-
         conteneurNatif = null;
         paginationNative.clear();
 
@@ -1635,9 +1562,7 @@
       }
 
       formulaire = nouveauFormulaire;
-
       ui = creerInterface();
-      personnaliserPlaceholders();
 
       const etat = lireEtat();
 
@@ -1650,13 +1575,8 @@
         'input[value="' + modeVoulu + '"]'
       ).checked = true;
 
-      if (etat?.ville) {
-        ui.ville.value = etat.ville;
-      }
-
-      if (etat?.rayon) {
-        ui.rayon.value = String(etat.rayon);
-      }
+      ui.ville.value = etat?.ville || "";
+      ui.rayon.value = String(etat?.rayon || 50);
 
       if (
         etat?.centre &&
@@ -1667,9 +1587,10 @@
       }
 
       changerModeRecherche(modeVoulu);
+      personnaliserPlaceholders();
 
       console.log(
-        "Interface Cosmetic Valley rétablie après Eventmaker."
+        "Interface Cosmetic Valley rétablie."
       );
 
     } catch (erreur) {
@@ -1677,7 +1598,6 @@
         "Réinsertion filtre proximité :",
         erreur
       );
-
     } finally {
       initialisationEnCours = false;
     }
@@ -1685,9 +1605,7 @@
 
   function surveillerEventmaker() {
     const observateur = new MutationObserver(() => {
-      if (minuterieObservation) {
-        clearTimeout(minuterieObservation);
-      }
+      clearTimeout(minuterieObservation);
 
       minuterieObservation = setTimeout(() => {
         minuterieObservation = null;
@@ -1697,7 +1615,8 @@
 
     observateur.observe(document.body, {
       childList: true,
-      subtree: true
+      subtree: true,
+      characterData: true
     });
   }
 
@@ -1716,7 +1635,6 @@
       }
 
       ajouterStyles();
-
       ui = creerInterface();
       personnaliserPlaceholders();
       brancherEvenements();
@@ -1744,7 +1662,6 @@
         if (etat.active && position) {
           rechercher(position, false);
         }
-
       } else {
         changerModeRecherche("classique");
       }
@@ -1769,45 +1686,6 @@
       );
     }
   }
-function personnaliserPlaceholders() {
-
-  const formulaire = trouverFormulaire();
-
-  if (!formulaire) return;
-
-  const groupe = formulaire.querySelector(
-    ".hierarchical-guest-fields-select"
-  );
-
-  if (!groupe) return;
-
-  const colonnes = [
-    ...groupe.querySelectorAll(":scope > .col-md-4")
-  ];
-
-  const textes = [
-    "Choisissez une région",
-    "Choisissez un département"
-  ];
-
-  colonnes.slice(0, 2).forEach((colonne, index) => {
-
-    const placeholder = colonne.querySelector(
-      '[class*="placeholder"]'
-    );
-
-    if (placeholder && !placeholder.textContent.trim().match(
-      /choisissez une/i
-    )) {
-      placeholder.textContent = textes[index];
-    }
-
-  });
-
-}
-  // ============================================================
-  // DEMARRAGE
-  // ============================================================
 
   if (document.readyState === "loading") {
     document.addEventListener(
