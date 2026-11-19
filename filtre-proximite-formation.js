@@ -21,7 +21,8 @@
     stockage: "cv_proximite_formation_v1"
   };
 
-  const CLE_CONTROLEUR = "__cvProximiteFormationControleur";
+  const CLE_CONTROLEUR =
+    "__cvProximiteFormationControleur";
 
   if (window[CLE_CONTROLEUR]) {
     window[CLE_CONTROLEUR].verifier();
@@ -126,16 +127,6 @@
   // ISOLATION DE LA LISTE FORMATION
   // ============================================================
 
-  /*
-   * La page contient deux annuaires.
-   *
-   * On conserve uniquement les éléments situés
-   * après le formulaire Formation et avant le
-   * formulaire Laboratoires.
-   *
-   * Cela évite de mélanger les deux listes.
-   */
-
   function appartientFormation(element, doc = document) {
     const formFormation = trouverFormulaire(doc);
 
@@ -157,12 +148,10 @@
 
     if (!formLabo) return true;
 
-    const avantLabo = !!(
+    return !!(
       element.compareDocumentPosition(formLabo) &
       Node.DOCUMENT_POSITION_FOLLOWING
     );
-
-    return avantLabo;
   }
 
   function extraireCartes(doc) {
@@ -190,6 +179,44 @@
     }
 
     return premiere.parentElement;
+  }
+
+  // ============================================================
+  // PLACEHOLDERS REGION / DEPARTEMENT
+  // ============================================================
+
+  function personnaliserPlaceholders() {
+    const form = trouverFormulaire();
+
+    if (!form) return;
+
+    const groupe = form.querySelector(
+      ".hierarchical-guest-fields-select"
+    );
+
+    if (!groupe) return;
+
+    const colonnes = [
+      ...groupe.querySelectorAll(":scope > .col-md-4")
+    ];
+
+    const textes = [
+      "Choisissez une région",
+      "Choisissez un département"
+    ];
+
+    colonnes.slice(0, 2).forEach((colonne, index) => {
+      const placeholder = colonne.querySelector(
+        '[class*="placeholder"], [class*="Placeholder"]'
+      );
+
+      if (
+        placeholder &&
+        placeholder.textContent.trim() !== textes[index]
+      ) {
+        placeholder.textContent = textes[index];
+      }
+    });
   }
 
   // ============================================================
@@ -438,10 +465,7 @@
         color: white;
       }
 
-      /* MOBILE */
-
       @media(max-width:650px) {
-
         #cv-formation-proximite .cv-prox-fields {
           grid-template-columns: 1fr;
         }
@@ -458,7 +482,6 @@
           flex-direction: column;
           gap: 12px;
         }
-
       }
     `;
 
@@ -498,7 +521,6 @@
 
     if (!selecteurMode) {
       selecteurMode = document.createElement("div");
-
       selecteurMode.id = "cv-formation-mode";
 
       selecteurMode.innerHTML = `
@@ -507,7 +529,6 @@
         </div>
 
         <div class="cv-mode-options">
-
           <label>
             <input
               type="radio"
@@ -524,7 +545,6 @@
               value="proximite">
             📍 À proximité
           </label>
-
         </div>
       `;
     }
@@ -535,7 +555,6 @@
 
     if (!bloc) {
       bloc = document.createElement("div");
-
       bloc.id = "cv-formation-proximite";
 
       bloc.innerHTML = `
@@ -591,7 +610,6 @@
           <div id="cv-formation-progress-track">
             <div id="cv-formation-progress-bar"></div>
           </div>
-
           <div id="cv-formation-progress-text"></div>
         </div>
 
@@ -603,13 +621,12 @@
       `;
     }
 
-    // Sélecteur placé avant le formulaire Formation.
-    // Le formulaire Laboratoires reste intact.
-
-    formulaire.insertAdjacentElement(
-      "beforebegin",
-      selecteurMode
-    );
+    if (selecteurMode.nextElementSibling !== formulaire) {
+      formulaire.insertAdjacentElement(
+        "beforebegin",
+        selecteurMode
+      );
+    }
 
     if (blocRegion) {
       blocRegion.insertAdjacentElement(
@@ -1046,6 +1063,7 @@
 
       try {
         const url = new URL(a.href, location.origin);
+
         const n = Number(
           url.searchParams.get(CONFIG.pageParam)
         );
@@ -1159,10 +1177,7 @@
 
     adherents.forEach(a => {
       const slug = slugDepuisUrl(a.url);
-
-      if (slug) {
-        index.set(slug, a);
-      }
+      if (slug) index.set(slug, a);
     });
 
     const dejaVus = new Set();
@@ -1656,6 +1671,10 @@
 
     if (!nouveauFormulaire) return;
 
+    // Réappliquer les placeholders même si
+    // le formulaire n'a pas été remplacé.
+    personnaliserPlaceholders();
+
     const selecteur = document.getElementById(
       "cv-formation-mode"
     );
@@ -1664,18 +1683,20 @@
       "cv-formation-proximite"
     );
 
-    if (
-      formulaire === nouveauFormulaire &&
-      selecteur &&
-      bloc
-    ) {
+    const formulaireChange =
+      formulaire !== nouveauFormulaire;
+
+    const interfaceAbsente =
+      !selecteur || !bloc;
+
+    if (!formulaireChange && !interfaceAbsente) {
       return;
     }
 
     initialisationEnCours = true;
 
     try {
-      if (formulaire !== nouveauFormulaire) {
+      if (formulaireChange) {
         ++requeteCourante;
 
         conteneurNatif = null;
@@ -1712,6 +1733,7 @@
       }
 
       changerModeRecherche(modeVoulu);
+      personnaliserPlaceholders();
 
       console.log(
         "Interface Formation rétablie."
@@ -1740,7 +1762,8 @@
 
     observateur.observe(document.body, {
       childList: true,
-      subtree: true
+      subtree: true,
+      characterData: true
     });
   }
 
@@ -1761,6 +1784,8 @@
       ajouterStyles();
 
       ui = creerInterface();
+
+      personnaliserPlaceholders();
 
       brancherEvenements();
 
