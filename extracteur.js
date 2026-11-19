@@ -1,6 +1,6 @@
 (async function () {
   "use strict";
-const flowUrl = window.URL_FLOW;
+
   
   // ============================================================
   // CONFIGURATION
@@ -337,36 +337,35 @@ const flowUrl = window.URL_FLOW;
   // ============================================================
 
   function obtenirConfiguration() {
-    const urlFlow = window.URL_FLOW;
 
-    if (!flowUrl) {
-      throw new Error("URL Power Automate absente.");
-    }
+  const flowUrl = window.URL_FLOW;
 
-    const secret = (
-      prompt(
-        "Saisis la clé de contrôle configurée dans Power Automate :"
-      ) || ""
-    ).trim();
-
-    if (!secret) {
-      throw new Error("Clé de contrôle absente.");
-    }
-
-    const url = new URL(flowUrl);
-
-    if (url.protocol !== "https:") {
-      throw new Error(
-        "L'URL Power Automate doit utiliser HTTPS."
-      );
-    }
-
-    // L'URL est conservée uniquement pendant la session.
-    // La clé n'est pas stockée dans le navigateur.
-    sessionStorage.setItem("cv_flow_url", flowUrl);
-
-    return { flowUrl, secret };
+  if (!flowUrl) {
+    throw new Error("URL Power Automate absente du bookmarklet.");
   }
+
+  const secret = (
+    prompt(
+      "Saisis la clé de contrôle configurée dans Power Automate :"
+    ) || ""
+  ).trim();
+
+  if (!secret) {
+    throw new Error("Clé de contrôle absente.");
+  }
+
+  const url = new URL(flowUrl);
+
+  if (url.protocol !== "https:") {
+    throw new Error(
+      "L'URL Power Automate doit utiliser HTTPS."
+    );
+  }
+
+  sessionStorage.setItem("cv_flow_url", flowUrl);
+
+  return { flowUrl, secret };
+}
 
   // ============================================================
   // REQUÊTES EVENTMAKER
