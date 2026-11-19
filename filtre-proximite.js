@@ -16,32 +16,33 @@
     concurrence: 4,
     pageSize: 20,
 
-    stockage: "cv_proximite_v6"
+    stockage: "cv_proximite_v7"
   };
 
   if (window.__cvProximiteInitialise) return;
-
-  window.__cvProximiteInitialise = true;
 
   let formulaire;
   let ui;
 
   let mode = "classique";
   let position = null;
-
   let resultats = [];
   let pageCourante = 1;
+
   let rechercheEnCours = false;
   let requeteCourante = 0;
 
   let blocRegion = null;
-  let blocRegionDisplay = "";
+  let affichageRegion = "";
 
   let conteneurNatif = null;
   let affichageNatif = "";
-  let paginationNative = [];
 
   let boutonsNatifs = [];
+
+  let paginationNative = new Map();
+
+  let cacheAdherents = null;
 
   // ============================================================
   // OUTILS
@@ -126,7 +127,9 @@
         e.matches(".guest-item")
       );
 
-      if (directs.length > 1) return parent;
+      if (directs.length > 1) {
+        return parent;
+      }
 
       parent = parent.parentElement;
     }
@@ -135,7 +138,7 @@
   }
 
   // ============================================================
-  // STYLES
+  // CSS
   // ============================================================
 
   function ajouterStyles() {
@@ -148,6 +151,9 @@
     style.id = "cv-proximite-styles";
 
     style.textContent = `
+
+      /* MODES */
+
       #cv-mode-recherche {
         margin: 15px 0 20px;
         padding: 16px 20px;
@@ -173,18 +179,19 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        font-size: 14px;
         cursor: pointer;
+        font-size: 14px;
       }
 
       .cv-mode-options input {
         accent-color: #70358d;
       }
 
+      /* PROXIMITE */
+
       #cv-proximite {
         display: none;
         margin: 12px 0 20px;
-        padding: 0;
         font-family: Arial, sans-serif;
       }
 
@@ -214,7 +221,6 @@
         border: 1px solid #ccc;
         border-radius: 6px;
         background: white;
-        color: #292929;
         font-size: 15px;
       }
 
@@ -249,41 +255,55 @@
         cursor: wait;
       }
 
+      /* PROGRESSION */
+
+      #cv-prox-progress {
+        display: none;
+        margin-top: 18px;
+      }
+
+      .cv-prox-progress-track {
+        width: 100%;
+        height: 10px;
+        background: #e7e7ec;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      #cv-prox-progress-bar {
+        width: 0%;
+        height: 100%;
+        background: #70358d;
+        border-radius: 8px;
+        transition: width .25s ease;
+      }
+
+      #cv-prox-progress-text {
+        margin-top: 7px;
+        font-size: 13px;
+        color: #666;
+      }
+
       #cv-prox-status {
         margin-top: 12px;
         font-size: 14px;
         line-height: 1.5;
       }
 
+      /* RESULTATS NATIFS */
+
       #cv-prox-results {
-        margin-top: 20px;
+        margin: 0;
+        padding: 0;
       }
 
-      #cv-prox-pagination {
-        display: flex;
-        justify-content: center;
-        gap: 8px;
-        flex-wrap: wrap;
-        margin: 22px 0;
+      #cv-prox-results .cv-prox-grid {
+        margin: 0;
       }
 
-      .cv-prox-page {
-        padding: 8px 12px;
-        border: 1px solid #ddd;
-        border-radius: 6px;
-        background: white;
-        color: #70358d;
-        cursor: pointer;
-      }
-
-      .cv-prox-page.active {
-        background: #70358d;
-        color: white;
-      }
-
-      .cv-prox-page:disabled {
-        opacity: .45;
-        cursor: default;
+      #cv-prox-results .guest-item img {
+        max-width: 100%;
+        object-fit: contain;
       }
 
       .cv-prox-distance {
@@ -294,12 +314,65 @@
         margin: 7px 0;
       }
 
-      #cv-prox-results .guest-item img {
-        max-width: 100%;
-        object-fit: contain;
+      /* PAGINATION STYLE EVENTMAKER */
+
+      #cv-prox-pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin: 35px 0;
+        padding: 0;
+        list-style: none;
       }
 
+      #cv-prox-pagination li {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .cv-prox-page {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-width: 30px;
+        height: 30px;
+        padding: 5px 9px;
+        border: 0;
+        border-radius: 50%;
+        background: #f4f4f4;
+        color: #c52f63;
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      .cv-prox-page.active {
+        background: #c52f63;
+        color: white;
+      }
+
+      .cv-prox-page:hover:not(:disabled) {
+        background: #70358d;
+        color: white;
+      }
+
+      .cv-prox-page:disabled {
+        cursor: default;
+      }
+
+      /* PAGINATION GPS SEULEMENT */
+
+      body.cv-proximite-active
+      #cv-prox-pagination {
+        display: flex;
+      }
+
+      /* MOBILE */
+
       @media(max-width:650px) {
+
         .cv-prox-fields {
           grid-template-columns: 1fr;
         }
@@ -316,6 +389,7 @@
           flex-direction: column;
           gap: 12px;
         }
+
       }
     `;
 
@@ -330,9 +404,7 @@
     formulaire = trouverFormulaire();
 
     if (!formulaire) {
-      throw new Error(
-        "Formulaire Eventmaker introuvable."
-      );
+      throw new Error("Formulaire Eventmaker introuvable.");
     }
 
     const regionInput = formulaire.querySelector(
@@ -348,12 +420,10 @@
     );
 
     if (blocRegion) {
-      blocRegionDisplay = blocRegion.style.display;
+      affichageRegion = blocRegion.style.display;
     }
 
-    // ----------------------------------------------------------
-    // SELECTEUR DES MODES
-    // ----------------------------------------------------------
+    // MODES
 
     const selecteurMode = document.createElement("div");
 
@@ -371,8 +441,7 @@
             type="radio"
             name="cv-mode"
             value="classique"
-            checked
-          >
+            checked>
           Par région / département
         </label>
 
@@ -380,17 +449,14 @@
           <input
             type="radio"
             name="cv-mode"
-            value="proximite"
-          >
+            value="proximite">
           📍 À proximité
         </label>
 
       </div>
     `;
 
-    // ----------------------------------------------------------
-    // CHAMPS PROXIMITE
-    // ----------------------------------------------------------
+    // PROXIMITE
 
     const bloc = document.createElement("div");
 
@@ -408,8 +474,7 @@
             id="cv-prox-ville"
             type="text"
             placeholder="Ex. Chartres ou 28000"
-            autocomplete="off"
-          >
+            autocomplete="off">
         </div>
 
         <div class="cv-prox-field">
@@ -446,6 +511,16 @@
 
       </div>
 
+      <div id="cv-prox-progress">
+
+        <div class="cv-prox-progress-track">
+          <div id="cv-prox-progress-bar"></div>
+        </div>
+
+        <div id="cv-prox-progress-text"></div>
+
+      </div>
+
       <div
         id="cv-prox-status"
         role="status"
@@ -453,11 +528,12 @@
       </div>
     `;
 
-    // ----------------------------------------------------------
-    // INSERTION DANS LE FORMULAIRE
-    // ----------------------------------------------------------
+    // Insertion dans la zone des filtres
 
-    formulaire.prepend(selecteurMode);
+    formulaire.insertAdjacentElement(
+      "beforebegin",
+      selecteurMode
+    );
 
     if (blocRegion) {
       blocRegion.insertAdjacentElement(
@@ -468,8 +544,6 @@
       formulaire.appendChild(bloc);
     }
 
-    // Boutons natifs conservés dans les deux modes.
-
     boutonsNatifs = [
       ...formulaire.querySelectorAll(
         'button[type="submit"], input[type="submit"]'
@@ -479,19 +553,50 @@
     return {
       mode: selecteurMode,
       bloc,
+
       ville: bloc.querySelector("#cv-prox-ville"),
       rayon: bloc.querySelector("#cv-prox-rayon"),
+
       geoloc: bloc.querySelector("#cv-prox-geoloc"),
       reset: bloc.querySelector("#cv-prox-reset"),
-      status: bloc.querySelector("#cv-prox-status")
+
+      status: bloc.querySelector("#cv-prox-status"),
+
+      progress: bloc.querySelector("#cv-prox-progress"),
+      progressBar: bloc.querySelector("#cv-prox-progress-bar"),
+      progressText: bloc.querySelector("#cv-prox-progress-text")
     };
   }
+
+  // ============================================================
+  // STATUT ET PROGRESSION
+  // ============================================================
 
   function statut(message, erreur = false) {
     ui.status.textContent = message;
 
     ui.status.style.color =
       erreur ? "#b42318" : "#555";
+  }
+
+  function progression(pourcentage, message) {
+    ui.progress.style.display = "block";
+
+    const valeur = Math.max(
+      0,
+      Math.min(100, pourcentage)
+    );
+
+    ui.progressBar.style.width =
+      valeur + "%";
+
+    ui.progressText.textContent =
+      message + " (" + Math.round(valeur) + " %)";
+  }
+
+  function masquerProgression() {
+    ui.progress.style.display = "none";
+    ui.progressBar.style.width = "0%";
   }
 
   function verrouiller(etat) {
@@ -506,13 +611,79 @@
   }
 
   // ============================================================
-  // CHANGEMENT DE MODE
+  // PAGINATION NATIVE
+  // ============================================================
+
+  function gererPaginationNative(masquer) {
+    const liens = [
+      ...document.querySelectorAll(
+        'a[href*="' + CONFIG.pageParam + '="]'
+      )
+    ].filter(a =>
+      !a.closest("#cv-prox-results")
+    );
+
+    const conteneurs = new Set();
+
+    liens.forEach(lien => {
+      const bloc = lien.closest(
+        ".pagination, .pagination-wrapper, nav, ul"
+      ) || lien.parentElement;
+
+      if (bloc) {
+        conteneurs.add(bloc);
+      }
+    });
+
+    conteneurs.forEach(bloc => {
+      if (masquer) {
+        if (!paginationNative.has(bloc)) {
+          paginationNative.set(bloc, {
+            display: bloc.style.getPropertyValue("display"),
+            priority: bloc.style.getPropertyPriority("display")
+          });
+        }
+
+        bloc.style.setProperty(
+          "display",
+          "none",
+          "important"
+        );
+      }
+    });
+
+    if (!masquer) {
+      paginationNative.forEach((ancien, bloc) => {
+        if (!bloc.isConnected) return;
+
+        if (ancien.display) {
+          bloc.style.setProperty(
+            "display",
+            ancien.display,
+            ancien.priority
+          );
+        } else {
+          bloc.style.removeProperty("display");
+        }
+      });
+
+      paginationNative.clear();
+    }
+  }
+
+  // ============================================================
+  // MODES
   // ============================================================
 
   function changerModeRecherche(nouveauMode) {
     mode = nouveauMode;
 
     const proximite = mode === "proximite";
+
+    document.body.classList.toggle(
+      "cv-proximite-active",
+      proximite
+    );
 
     if (blocRegion) {
       if (proximite) {
@@ -524,21 +695,21 @@
       } else {
         blocRegion.style.removeProperty("display");
 
-        if (blocRegionDisplay) {
-          blocRegion.style.display = blocRegionDisplay;
+        if (affichageRegion) {
+          blocRegion.style.display = affichageRegion;
         }
       }
     }
 
-    ui.bloc.style.display = proximite
-      ? "block"
-      : "none";
+    ui.bloc.style.display =
+      proximite ? "block" : "none";
 
-    // Le bouton natif Rechercher reste visible.
+    gererPaginationNative(proximite);
 
     if (!proximite) {
       ++requeteCourante;
       restaurerResultatsNatifs();
+      masquerProgression();
     }
 
     const ancien = lireEtat() || {};
@@ -630,9 +801,7 @@
     const communes = await response.json();
 
     if (!Array.isArray(communes) || !communes.length) {
-      throw new Error(
-        "Aucune commune trouvée."
-      );
+      throw new Error("Aucune commune trouvée.");
     }
 
     const exacte = communes.find(c =>
@@ -650,15 +819,59 @@
     return {
       latitude: commune.centre.coordinates[1],
       longitude: commune.centre.coordinates[0],
-      nom: commune.nom
+      nom: commune.nom,
+      codePostal: commune.codesPostaux?.[0] || ""
     };
   }
 
   // ============================================================
-  // CHARGEMENT JSON GITHUB
+  // GEOCODAGE INVERSE
+  // ============================================================
+
+  async function identifierVille(positionGPS) {
+    try {
+      const url =
+        "https://api-adresse.data.gouv.fr/reverse/?" +
+        new URLSearchParams({
+          lon: positionGPS.longitude,
+          lat: positionGPS.latitude
+        });
+
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error("Géocodage inverse indisponible");
+      }
+
+      const json = await response.json();
+
+      const properties =
+        json.features?.[0]?.properties;
+
+      if (!properties) return "";
+
+      const ville = properties.city || "";
+      const codePostal = properties.postcode || "";
+
+      return [
+        ville,
+        codePostal ? "(" + codePostal + ")" : ""
+      ].filter(Boolean).join(" ");
+
+    } catch {
+      return "";
+    }
+  }
+
+  // ============================================================
+  // JSON GITHUB
   // ============================================================
 
   async function chargerAdherents() {
+    if (cacheAdherents) {
+      return cacheAdherents;
+    }
+
     const response = await fetch(
       CONFIG.dataUrl + "?v=" + Date.now(),
       { cache: "no-store" }
@@ -677,12 +890,10 @@
       : json.adherents;
 
     if (!Array.isArray(source)) {
-      throw new Error(
-        "Format JSON incorrect."
-      );
+      throw new Error("Format JSON incorrect.");
     }
 
-    return source.filter(a =>
+    cacheAdherents = source.filter(a =>
       a.url &&
       a.latitude !== null &&
       a.latitude !== "" &&
@@ -691,10 +902,12 @@
       Number.isFinite(Number(a.latitude)) &&
       Number.isFinite(Number(a.longitude))
     );
+
+    return cacheAdherents;
   }
 
   // ============================================================
-  // PARAMETRES EVENTMAKER
+  // FILTRES EVENTMAKER
   // ============================================================
 
   function obtenirParametresNatifs() {
@@ -710,9 +923,6 @@
         params.append(cle, valeur);
       }
     }
-
-    // Région et Département exclus uniquement
-    // des requêtes géographiques.
 
     params.delete(
       CONFIG.prefix +
@@ -730,7 +940,7 @@
   }
 
   // ============================================================
-  // PAGINATION EVENTMAKER
+  // PAGES EVENTMAKER
   // ============================================================
 
   function urlPage(numero, filtres) {
@@ -740,7 +950,6 @@
     );
 
     url.hash = "";
-
     url.search = filtres.toString();
 
     url.searchParams.set(
@@ -764,10 +973,7 @@
           url.searchParams.get(CONFIG.pageParam)
         );
 
-        if (
-          Number.isInteger(n) &&
-          n > maximum
-        ) {
+        if (Number.isInteger(n) && n > maximum) {
           maximum = n;
         }
       } catch {}
@@ -810,7 +1016,7 @@
   }
 
   async function chargerToutesLesCartes(filtres) {
-    statut("Lecture des résultats Eventmaker...");
+    progression(5, "Préparation de la recherche");
 
     const premiere = await chargerPage(1, filtres);
 
@@ -823,11 +1029,15 @@
     }
 
     const pages = new Array(totalPages);
-
     pages[0] = premiere.cartes;
 
     let prochainePage = 2;
     let terminees = 1;
+
+    progression(
+      10 + 75 * terminees / totalPages,
+      "Recherche des entreprises"
+    );
 
     async function travailleur() {
       while (prochainePage <= totalPages) {
@@ -839,15 +1049,11 @@
         );
 
         pages[numero - 1] = resultat.cartes;
-
         terminees++;
 
-        statut(
-          "Chargement Eventmaker : " +
-          terminees +
-          " / " +
-          totalPages +
-          " pages."
+        progression(
+          10 + 75 * terminees / totalPages,
+          "Recherche des entreprises"
         );
       }
     }
@@ -898,7 +1104,6 @@
       if (!lien) return;
 
       const slug = slugDepuisUrl(lien.href);
-
       const adherent = index.get(slug);
 
       if (!adherent || dejaVus.has(slug)) {
@@ -931,7 +1136,7 @@
   }
 
   // ============================================================
-  // LOGOS NATIFS EVENTMAKER
+  // LOGOS EVENTMAKER
   // ============================================================
 
   function restaurerImages(carte) {
@@ -979,29 +1184,17 @@
         img.style.display = "none";
       }
     });
-
-    carte.querySelectorAll(
-      "[data-bg], [data-background]"
-    ).forEach(element => {
-      const background =
-        element.getAttribute("data-bg") ||
-        element.getAttribute("data-background");
-
-      if (background) {
-        element.style.backgroundImage =
-          'url("' +
-          background.replace(/["\\]/g, "") +
-          '")';
-      }
-    });
   }
 
   // ============================================================
-  // AFFICHAGE NATIF
+  // RESULTATS NATIFS
   // ============================================================
 
   function masquerResultatsNatifs() {
-    if (conteneurNatif) return;
+    if (conteneurNatif) {
+      gererPaginationNative(true);
+      return;
+    }
 
     conteneurNatif = trouverConteneur(document);
 
@@ -1015,20 +1208,7 @@
 
     conteneurNatif.style.display = "none";
 
-    const zone = conteneurNatif.parentElement;
-
-    paginationNative = zone
-      ? [...zone.querySelectorAll(".pagination")]
-      : [];
-
-    paginationNative = paginationNative.filter(
-      p => !p.closest("#cv-prox-results")
-    );
-
-    paginationNative.forEach(p => {
-      p.dataset.cvDisplayOriginal = p.style.display;
-      p.style.display = "none";
-    });
+    gererPaginationNative(true);
   }
 
   function restaurerResultatsNatifs() {
@@ -1039,22 +1219,15 @@
       conteneurNatif = null;
     }
 
-    paginationNative.forEach(p => {
-      p.style.display =
-        p.dataset.cvDisplayOriginal || "";
-
-      delete p.dataset.cvDisplayOriginal;
-    });
-
-    paginationNative = [];
-
     document.getElementById(
       "cv-prox-results"
     )?.remove();
+
+    gererPaginationNative(false);
   }
 
   // ============================================================
-  // AFFICHAGE DES RESULTATS
+  // AFFICHAGE RESULTATS
   // ============================================================
 
   function afficherResultats() {
@@ -1068,7 +1241,6 @@
 
     if (!conteneur) {
       conteneur = document.createElement("div");
-
       conteneur.id = "cv-prox-results";
 
       conteneurNatif.insertAdjacentElement(
@@ -1087,9 +1259,13 @@
       debut + CONFIG.pageSize
     );
 
+    // Même classe de grille que le conteneur natif.
     const grille = document.createElement("div");
 
-    grille.className = "row";
+    grille.className =
+      conteneurNatif.className || "row";
+
+    grille.classList.add("cv-prox-grid");
 
     page.forEach(item => {
       const carte = item.carte.cloneNode(true);
@@ -1097,13 +1273,10 @@
       restaurerImages(carte);
 
       const badge = document.createElement("div");
-
       badge.className = "cv-prox-distance";
 
       badge.textContent =
-        "📍 " +
-        item.distance.toFixed(1) +
-        " km";
+        "📍 " + item.distance.toFixed(1) + " km";
 
       const lien = carte.querySelector(
         'a[href*="/annuaire-entreprises/"]'
@@ -1127,16 +1300,21 @@
       conteneur.appendChild(vide);
     }
 
+    // ========================================================
+    // PAGINATION GPS
+    // ========================================================
+
     const totalPages = Math.ceil(
       resultats.length / CONFIG.pageSize
     );
 
     if (totalPages > 1) {
-      const navigation = document.createElement("div");
+      const navigation = document.createElement("ul");
 
       navigation.id = "cv-prox-pagination";
 
       function ajouterBouton(label, numero, actif) {
+        const li = document.createElement("li");
         const bouton = document.createElement("button");
 
         bouton.type = "button";
@@ -1146,12 +1324,10 @@
           (actif ? " active" : "");
 
         bouton.textContent = label;
-
         bouton.disabled = actif;
 
         bouton.addEventListener("click", () => {
           pageCourante = numero;
-
           afficherResultats();
 
           ui.bloc.scrollIntoView({
@@ -1160,7 +1336,8 @@
           });
         });
 
-        navigation.appendChild(bouton);
+        li.appendChild(bouton);
+        navigation.appendChild(li);
       }
 
       if (pageCourante > 1) {
@@ -1199,7 +1376,7 @@
   }
 
   // ============================================================
-  // RECHERCHE GEOGRAPHIQUE
+  // RECHERCHE PRINCIPALE
   // ============================================================
 
   async function rechercher(centre, enregistrer = true) {
@@ -1210,11 +1387,7 @@
     const numeroRequete = ++requeteCourante;
 
     try {
-      const rayon = Number(ui.rayon.value);
-
-      statut(
-        "Chargement des données géographiques..."
-      );
+      progression(3, "Chargement des données");
 
       const adherents = await chargerAdherents();
 
@@ -1224,13 +1397,13 @@
         filtres
       );
 
-      statut("Calcul des distances...");
+      progression(90, "Calcul des distances");
 
       const selection = filtrerParDistance(
         cartes,
         adherents,
         centre,
-        rayon
+        Number(ui.rayon.value)
       );
 
       if (
@@ -1248,13 +1421,19 @@
         enregistrerEtat({
           mode: "proximite",
           centre,
-          rayon,
+          rayon: Number(ui.rayon.value),
           ville: ui.ville.value,
           active: true
         });
       }
 
+      progression(100, "Recherche terminée");
+
       afficherResultats();
+
+      setTimeout(() => {
+        masquerProgression();
+      }, 700);
 
     } catch (erreur) {
       console.error(
@@ -1262,6 +1441,7 @@
         erreur
       );
 
+      masquerProgression();
       statut(erreur.message, true);
 
     } finally {
@@ -1270,7 +1450,7 @@
   }
 
   // ============================================================
-  // RECHERCHE DEPUIS LE BOUTON UNIQUE
+  // RECHERCHE DEPUIS LE BOUTON NATIF
   // ============================================================
 
   async function lancerRechercheProximite() {
@@ -1282,8 +1462,8 @@
       let centre;
 
       if (
-        valeur === "Ma position actuelle" &&
-        position
+        position &&
+        valeur === position.libelle
       ) {
         centre = position;
 
@@ -1291,16 +1471,19 @@
         statut("Recherche de la commune...");
 
         centre = await geocoderVille(valeur);
+
+        centre.libelle =
+          centre.nom +
+          (centre.codePostal
+            ? " (" + centre.codePostal + ")"
+            : "");
+
+        ui.ville.value = centre.libelle;
       }
 
       await rechercher(centre);
 
     } catch (erreur) {
-      console.error(
-        "Recherche proximité :",
-        erreur
-      );
-
       statut(erreur.message, true);
     }
   }
@@ -1310,9 +1493,6 @@
   // ============================================================
 
   function brancherEvenements() {
-
-    // CHANGEMENT DE MODE
-
     ui.mode.querySelectorAll(
       'input[name="cv-mode"]'
     ).forEach(input => {
@@ -1332,7 +1512,15 @@
         const centre =
           await obtenirPositionNavigateur();
 
-        ui.ville.value = "Ma position actuelle";
+        const ville =
+          await identifierVille(centre);
+
+        centre.libelle = ville ||
+          "Ma position actuelle (" +
+          centre.latitude.toFixed(4) + ", " +
+          centre.longitude.toFixed(4) + ")";
+
+        ui.ville.value = centre.libelle;
 
         await rechercher(centre);
 
@@ -1341,17 +1529,16 @@
       }
     });
 
-    // ENTREE DANS LE CHAMP VILLE
+    // ENTREE DANS VILLE
 
     ui.ville.addEventListener("keydown", e => {
       if (e.key === "Enter") {
         e.preventDefault();
-
         lancerRechercheProximite();
       }
     });
 
-    // REINITIALISATION PROXIMITE
+    // REINITIALISATION
 
     ui.reset.addEventListener("click", () => {
       if (rechercheEnCours) return;
@@ -1364,6 +1551,7 @@
       ui.rayon.value = "50";
 
       restaurerResultatsNatifs();
+      masquerProgression();
 
       enregistrerEtat({
         mode: "proximite",
@@ -1373,24 +1561,17 @@
       statut("Filtre de proximité désactivé.");
     });
 
-    // ========================================================
-    // BOUTON RECHERCHER NATIF EVENTMAKER
-    // ========================================================
+    // BOUTON RECHERCHER EVENTMAKER
 
     formulaire.addEventListener(
       "submit",
-      function (e) {
-
-        if (mode !== "proximite") {
-          return;
-        }
+      e => {
+        if (mode !== "proximite") return;
 
         e.preventDefault();
-
         e.stopPropagation();
 
         lancerRechercheProximite();
-
       },
       true
     );
@@ -1424,18 +1605,12 @@
         ).checked = true;
 
         ui.ville.value = etat.ville || "";
-
-        ui.rayon.value =
-          String(etat.rayon || 50);
+        ui.rayon.value = String(etat.rayon || 50);
 
         if (
           etat.centre &&
-          Number.isFinite(
-            Number(etat.centre.latitude)
-          ) &&
-          Number.isFinite(
-            Number(etat.centre.longitude)
-          )
+          Number.isFinite(Number(etat.centre.latitude)) &&
+          Number.isFinite(Number(etat.centre.longitude))
         ) {
           position = etat.centre;
         }
@@ -1450,6 +1625,8 @@
         changerModeRecherche("classique");
       }
 
+      window.__cvProximiteInitialise = true;
+
       console.log(
         "Filtre proximité Cosmetic Valley initialisé :",
         mode
@@ -1463,61 +1640,6 @@
     }
   }
 
-  // ==================================================
-// SURVEILLANCE DU FORMULAIRE EVENTMAKER
-// ==================================================
-
-let reinitialisationProgrammee = false;
-
-const observateur = new MutationObserver(() => {
-
-  if (reinitialisationProgrammee) return;
-
-  const nouveauFormulaire = trouverFormulaire();
-
-  if (!nouveauFormulaire) return;
-
-  const boutonMode = document.getElementById(
-    "cv-mode-recherche"
-  );
-
-  const blocProximite = document.getElementById(
-    "cv-proximite"
-  );
-
-  if (!boutonMode || !blocProximite) {
-
-    reinitialisationProgrammee = true;
-
-    setTimeout(() => {
-
-      observateur.disconnect();
-
-      // Autoriser la réinitialisation du script
-      window.__cvProximiteInitialise = false;
-
-      // Supprimer les éventuels éléments restants
-      document.getElementById(
-        "cv-mode-recherche"
-      )?.remove();
-
-      document.getElementById(
-        "cv-proximite"
-      )?.remove();
-
-      // Recharger la page pour reconstruire proprement
-      // le formulaire et notre interface
-      location.reload();
-
-    }, 300);
-  }
-});
-
-observateur.observe(document.body, {
-  childList: true,
-  subtree: true
-});
-  
   // ============================================================
   // DEMARRAGE
   // ============================================================
