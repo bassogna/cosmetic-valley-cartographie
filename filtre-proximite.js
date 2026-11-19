@@ -1,50 +1,39 @@
 (function () {
   "use strict";
 
-  // ============================================================
-  // CONFIGURATION
-  // ============================================================
-
   const CONFIG = {
     dataUrl:
       "https://bassogna.github.io/cosmetic-valley-cartographie/cosmetic_valley_adherents_carte.json",
-
     prefix: "guests_list_916095",
     pageParam: "guests_list_916095_page",
-
     maxPages: 50,
     concurrence: 4,
     pageSize: 20,
-
-    stockage: "cv_proximite_v4"
+    stockage: "cv_proximite_v5"
   };
 
   if (window.__cvProximiteInitialise) return;
 
-  window.__cvProximiteInitialise = true;
-
   let formulaire;
   let ui;
-
   let mode = "classique";
   let position = null;
-
   let resultats = [];
   let pageCourante = 1;
   let rechercheEnCours = false;
+  let requeteCourante = 0;
+
+  let blocRegion = null;
+  let blocRegionDisplay = "";
+  let boutonsNatifs = [];
 
   let conteneurNatif = null;
   let affichageNatif = "";
-
   let paginationNative = [];
-  let blocRegion = null;
-  let affichageRegion = "";
 
-  let requeteCourante = 0;
-
-  // ============================================================
+  // ==================================================
   // OUTILS
-  // ============================================================
+  // ==================================================
 
   function normaliser(value) {
     return String(value || "")
@@ -57,24 +46,18 @@
   function slugDepuisUrl(value) {
     try {
       const url = new URL(value, location.origin);
-
-      const parties = url.pathname
-        .split("/")
-        .filter(Boolean);
+      const parties = url.pathname.split("/").filter(Boolean);
 
       return decodeURIComponent(
         parties[parties.length - 1] || ""
       ).toLowerCase();
-
     } catch {
       return "";
     }
   }
 
   function distanceKm(lat1, lon1, lat2, lon2) {
-    const R = 6371;
     const rad = x => x * Math.PI / 180;
-
     const dLat = rad(lat2 - lat1);
     const dLon = rad(lon2 - lon1);
 
@@ -84,9 +67,7 @@
       Math.cos(rad(lat2)) *
       Math.sin(dLon / 2) ** 2;
 
-    return 2 * R * Math.asin(
-      Math.min(1, Math.sqrt(a))
-    );
+    return 12742 * Math.asin(Math.min(1, Math.sqrt(a)));
   }
 
   function lireEtat() {
@@ -104,10 +85,6 @@
       CONFIG.stockage,
       JSON.stringify(etat)
     );
-  }
-
-  function effacerEtat() {
-    sessionStorage.removeItem(CONFIG.stockage);
   }
 
   function trouverFormulaire() {
@@ -130,9 +107,7 @@
         e.matches(".guest-item")
       );
 
-      if (directs.length > 1) {
-        return parent;
-      }
+      if (directs.length > 1) return parent;
 
       parent = parent.parentElement;
     }
@@ -140,18 +115,19 @@
     return premiere.parentElement;
   }
 
-  // ============================================================
-  // STYLES
-  // ============================================================
+  // ==================================================
+  // CSS
+  // ==================================================
 
   function ajouterStyles() {
-    const style = document.createElement("style");
+    if (document.getElementById("cv-proximite-styles")) return;
 
+    const style = document.createElement("style");
     style.id = "cv-proximite-styles";
 
     style.textContent = `
       #cv-mode-recherche {
-        margin: 18px 0;
+        margin: 15px 0 20px;
         padding: 16px 20px;
         background: #f7f7f9;
         border: 1px solid #e5e5e8;
@@ -159,7 +135,7 @@
         font-family: Arial, sans-serif;
       }
 
-      #cv-mode-recherche .cv-mode-title {
+      .cv-mode-title {
         font-size: 15px;
         font-weight: bold;
         margin-bottom: 12px;
@@ -167,7 +143,7 @@
 
       .cv-mode-options {
         display: flex;
-        gap: 24px;
+        gap: 25px;
         flex-wrap: wrap;
       }
 
@@ -185,11 +161,8 @@
 
       #cv-proximite {
         display: none;
-        margin: 15px 0 20px;
-        padding: 20px;
-        background: #f8f8fa;
-        border: 1px solid #e1e1e5;
-        border-radius: 9px;
+        margin: 12px 0 20px;
+        padding: 0;
         font-family: Arial, sans-serif;
       }
 
@@ -227,6 +200,7 @@
         display: flex;
         gap: 10px;
         flex-wrap: wrap;
+        margin-top: 12px;
       }
 
       .cv-prox-btn {
@@ -259,7 +233,7 @@
       }
 
       #cv-prox-status {
-        margin-top: 15px;
+        margin-top: 12px;
         font-size: 14px;
         line-height: 1.5;
       }
@@ -292,7 +266,6 @@
 
       .cv-prox-page:disabled {
         opacity: .45;
-        cursor: default;
       }
 
       .cv-prox-distance {
@@ -331,17 +304,15 @@
     document.head.appendChild(style);
   }
 
-  // ============================================================
+  // ==================================================
   // INTERFACE
-  // ============================================================
+  // ==================================================
 
   function creerInterface() {
     formulaire = trouverFormulaire();
 
     if (!formulaire) {
-      throw new Error(
-        "Formulaire Eventmaker introuvable."
-      );
+      throw new Error("Formulaire Eventmaker introuvable.");
     }
 
     const regionInput = formulaire.querySelector(
@@ -350,53 +321,45 @@
       '_search_options[company_dpt_region_level_1]"]'
     );
 
-  blocRegion = regionInput?.closest(
-  ".hierarchical-guest-fields-select"
-) || null;
-
-if (!blocRegion) {
-  blocRegion = document.querySelector(
-    ".hierarchical-guest-fields-select"
-  );
-}
+    blocRegion = regionInput?.closest(
+      ".hierarchical-guest-fields-select"
+    ) || formulaire.querySelector(
+      ".hierarchical-guest-fields-select"
+    );
 
     if (blocRegion) {
-      affichageRegion = blocRegion.style.display;
+      blocRegionDisplay = blocRegion.style.display;
     }
 
-    const selecteurMode = document.createElement("div");
+    // Sélecteur des modes
 
+    const selecteurMode = document.createElement("div");
     selecteurMode.id = "cv-mode-recherche";
 
     selecteurMode.innerHTML = `
-      <div class="cv-mode-title">
-        Mode de recherche
-      </div>
+      <div class="cv-mode-title">Mode de recherche</div>
 
       <div class="cv-mode-options">
         <label>
-          <input
-            type="radio"
-            name="cv-mode"
-            value="classique"
-            checked
-          >
+          <input type="radio"
+                 name="cv-mode"
+                 value="classique"
+                 checked>
           Par région / département
         </label>
 
         <label>
-          <input
-            type="radio"
-            name="cv-mode"
-            value="proximite"
-          >
+          <input type="radio"
+                 name="cv-mode"
+                 value="proximite">
           📍 À proximité
         </label>
       </div>
     `;
 
-    const bloc = document.createElement("div");
+    // Champs géographiques
 
+    const bloc = document.createElement("div");
     bloc.id = "cv-proximite";
 
     bloc.innerHTML = `
@@ -411,8 +374,7 @@ if (!blocRegion) {
             id="cv-prox-ville"
             type="text"
             placeholder="Ex. Chartres ou 28000"
-            autocomplete="off"
-          >
+            autocomplete="off">
         </div>
 
         <div class="cv-prox-field">
@@ -432,49 +394,56 @@ if (!blocRegion) {
       </div>
 
       <div class="cv-prox-buttons">
-
-        <button
-          type="button"
-          id="cv-prox-geoloc"
-          class="cv-prox-btn cv-prox-location">
+        <button type="button"
+                id="cv-prox-geoloc"
+                class="cv-prox-btn cv-prox-location">
           📍 Autour de moi
         </button>
 
-        <button
-          type="button"
-          id="cv-prox-search"
-          class="cv-prox-btn cv-prox-primary">
+        <button type="button"
+                id="cv-prox-search"
+                class="cv-prox-btn cv-prox-primary">
           🔍 Rechercher
         </button>
 
-        <button
-          type="button"
-          id="cv-prox-reset"
-          class="cv-prox-btn cv-prox-reset">
+        <button type="button"
+                id="cv-prox-reset"
+                class="cv-prox-btn cv-prox-reset">
           Réinitialiser
         </button>
-
       </div>
 
-      <div
-        id="cv-prox-status"
-        role="status"
-        aria-live="polite">
-      </div>
+      <div id="cv-prox-status"
+           role="status"
+           aria-live="polite"></div>
     `;
 
-    // Insertion hors du composant React Eventmaker.
-    // Les deux modes restent dans la même zone visuelle.
+    // Le sélecteur est placé au début du formulaire.
+    // Le bloc proximité remplace visuellement
+    // Région / Département.
 
-    formulaire.insertAdjacentElement(
-      "beforebegin",
-      selecteurMode
-    );
+    formulaire.prepend(selecteurMode);
 
-    formulaire.insertAdjacentElement(
-      "afterend",
-      bloc
-    );
+    if (blocRegion) {
+      blocRegion.insertAdjacentElement(
+        "afterend",
+        bloc
+      );
+    } else {
+      formulaire.appendChild(bloc);
+    }
+
+    // Boutons natifs Eventmaker
+
+    boutonsNatifs = [
+      ...formulaire.querySelectorAll(
+        'button[type="submit"], input[type="submit"]'
+      )
+    ].filter(b => !b.closest("#cv-proximite"))
+     .map(element => ({
+       element,
+       display: element.style.display
+     }));
 
     return {
       mode: selecteurMode,
@@ -490,22 +459,20 @@ if (!blocRegion) {
 
   function statut(message, erreur = false) {
     ui.status.textContent = message;
-
     ui.status.style.color =
       erreur ? "#b42318" : "#555";
   }
 
   function verrouiller(etat) {
     rechercheEnCours = etat;
-
     ui.geoloc.disabled = etat;
     ui.search.disabled = etat;
     ui.reset.disabled = etat;
   }
 
-  // ============================================================
-  // MODES DE RECHERCHE
-  // ============================================================
+  // ==================================================
+  // CHANGEMENT DE MODE
+  // ==================================================
 
   function changerModeRecherche(nouveauMode) {
     mode = nouveauMode;
@@ -513,19 +480,28 @@ if (!blocRegion) {
     const proximite = mode === "proximite";
 
     if (blocRegion) {
-  blocRegion.style.setProperty(
-    "display",
-    proximite ? "none" : (affichageRegion || ""),
-    proximite ? "important" : ""
-  );
-}
+      if (proximite) {
+        blocRegion.style.setProperty(
+          "display", "none", "important"
+        );
+      } else {
+        blocRegion.style.removeProperty("display");
+
+        if (blocRegionDisplay) {
+          blocRegion.style.display = blocRegionDisplay;
+        }
+      }
+    }
 
     ui.bloc.style.display = proximite
       ? "block"
       : "none";
 
-    // Les boutons natifs sont conservés.
-    // Leur soumission est interceptée en mode proximité.
+    boutonsNatifs.forEach(item => {
+      item.element.style.display = proximite
+        ? "none"
+        : item.display;
+    });
 
     if (!proximite) {
       ++requeteCourante;
@@ -541,16 +517,14 @@ if (!blocRegion) {
     });
   }
 
-  // ============================================================
+  // ==================================================
   // GEOLOCALISATION
-  // ============================================================
+  // ==================================================
 
   function obtenirPositionNavigateur() {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
-        reject(new Error(
-          "Géolocalisation indisponible."
-        ));
+        reject(new Error("Géolocalisation indisponible."));
         return;
       }
 
@@ -582,9 +556,9 @@ if (!blocRegion) {
     });
   }
 
-  // ============================================================
-  // GEOCODAGE
-  // ============================================================
+  // ==================================================
+  // RECHERCHE VILLE
+  // ==================================================
 
   async function geocoderVille(valeur) {
     const recherche = valeur.trim();
@@ -643,9 +617,9 @@ if (!blocRegion) {
     };
   }
 
-  // ============================================================
-  // DONNEES GPS
-  // ============================================================
+  // ==================================================
+  // JSON GITHUB
+  // ==================================================
 
   async function chargerAdherents() {
     const response = await fetch(
@@ -654,9 +628,7 @@ if (!blocRegion) {
     );
 
     if (!response.ok) {
-      throw new Error(
-        "Impossible de charger les adhérents."
-      );
+      throw new Error("Impossible de charger les adhérents.");
     }
 
     const json = await response.json();
@@ -680,13 +652,12 @@ if (!blocRegion) {
     );
   }
 
-  // ============================================================
-  // FILTRES NATIFS EVENTMAKER
-  // ============================================================
+  // ==================================================
+  // FILTRES EVENTMAKER
+  // ==================================================
 
   function obtenirParametresNatifs() {
     const params = new URLSearchParams();
-
     const data = new FormData(formulaire);
 
     for (const [cle, valeur] of data.entries()) {
@@ -698,8 +669,8 @@ if (!blocRegion) {
       }
     }
 
-    // On conserve mot-clé et activité.
-    // Région et département sont exclus en proximité.
+    // Exclure Région et Département.
+    // Conserver Mot-clé et Activité.
 
     params.delete(
       CONFIG.prefix +
@@ -716,9 +687,9 @@ if (!blocRegion) {
     return params;
   }
 
-  // ============================================================
+  // ==================================================
   // PAGINATION EVENTMAKER
-  // ============================================================
+  // ==================================================
 
   function urlPage(numero, filtres) {
     const url = new URL(
@@ -727,7 +698,6 @@ if (!blocRegion) {
     );
 
     url.hash = "";
-
     url.search = filtres.toString();
 
     url.searchParams.set(
@@ -738,21 +708,14 @@ if (!blocRegion) {
     return url.href;
   }
 
-  function extraireCartes(doc) {
-    return [...doc.querySelectorAll(".guest-item")];
-  }
-
   function nombrePages(doc) {
     let maximum = 1;
 
-    const liens = doc.querySelectorAll(
+    doc.querySelectorAll(
       'a[href*="' + CONFIG.pageParam + '="]'
-    );
-
-    liens.forEach(a => {
+    ).forEach(a => {
       try {
         const url = new URL(a.href, location.origin);
-
         const n = Number(
           url.searchParams.get(CONFIG.pageParam)
         );
@@ -777,10 +740,8 @@ if (!blocRegion) {
 
     if (!response.ok) {
       throw new Error(
-        "Erreur Eventmaker page " +
-        numero +
-        " : HTTP " +
-        response.status
+        "Erreur Eventmaker page " + numero +
+        " : HTTP " + response.status
       );
     }
 
@@ -793,7 +754,7 @@ if (!blocRegion) {
 
     return {
       doc,
-      cartes: extraireCartes(doc)
+      cartes: [...doc.querySelectorAll(".guest-item")]
     };
   }
 
@@ -801,12 +762,11 @@ if (!blocRegion) {
     statut("Lecture des résultats Eventmaker...");
 
     const premiere = await chargerPage(1, filtres);
-
     const totalPages = nombrePages(premiere.doc);
 
     if (totalPages > CONFIG.maxPages) {
       throw new Error(
-        "Nombre de pages supérieur à la limite de sécurité."
+        "Nombre de pages supérieur à la limite."
       );
     }
 
@@ -826,15 +786,11 @@ if (!blocRegion) {
         );
 
         pages[numero - 1] = resultat.cartes;
-
         terminees++;
 
         statut(
           "Chargement Eventmaker : " +
-          terminees +
-          " / " +
-          totalPages +
-          " pages."
+          terminees + " / " + totalPages + " pages."
         );
       }
     }
@@ -854,9 +810,9 @@ if (!blocRegion) {
     return pages.flat();
   }
 
-  // ============================================================
-  // FILTRE GEOGRAPHIQUE
-  // ============================================================
+  // ==================================================
+  // FILTRAGE GEOGRAPHIQUE
+  // ==================================================
 
   function filtrerParDistance(
     cartes,
@@ -868,7 +824,6 @@ if (!blocRegion) {
 
     adherents.forEach(a => {
       const slug = slugDepuisUrl(a.url);
-
       if (slug) index.set(slug, a);
     });
 
@@ -912,9 +867,9 @@ if (!blocRegion) {
     return selection;
   }
 
-  // ============================================================
-  // LOGOS EVENTMAKER
-  // ============================================================
+  // ==================================================
+  // LOGOS NATIFS EVENTMAKER
+  // ==================================================
 
   function restaurerImages(carte) {
     carte.querySelectorAll("img").forEach(img => {
@@ -943,11 +898,7 @@ if (!blocRegion) {
 
       img.loading = "eager";
 
-      img.classList.remove(
-        "lazyload",
-        "lazyloading"
-      );
-
+      img.classList.remove("lazyload", "lazyloading");
       img.classList.add("lazyloaded");
 
       img.style.visibility = "visible";
@@ -978,9 +929,9 @@ if (!blocRegion) {
     });
   }
 
-  // ============================================================
+  // ==================================================
   // AFFICHAGE NATIF
-  // ============================================================
+  // ==================================================
 
   function masquerResultatsNatifs() {
     if (conteneurNatif) return;
@@ -989,12 +940,11 @@ if (!blocRegion) {
 
     if (!conteneurNatif) {
       throw new Error(
-        "Conteneur des fiches Eventmaker introuvable."
+        "Conteneur des fiches introuvable."
       );
     }
 
     affichageNatif = conteneurNatif.style.display;
-
     conteneurNatif.style.display = "none";
 
     const zone = conteneurNatif.parentElement;
@@ -1035,9 +985,9 @@ if (!blocRegion) {
     )?.remove();
   }
 
-  // ============================================================
-  // AFFICHAGE RESULTATS
-  // ============================================================
+  // ==================================================
+  // AFFICHAGE DES RESULTATS
+  // ==================================================
 
   function afficherResultats() {
     if (mode !== "proximite") return;
@@ -1080,9 +1030,7 @@ if (!blocRegion) {
       badge.className = "cv-prox-distance";
 
       badge.textContent =
-        "📍 " +
-        item.distance.toFixed(1) +
-        " km";
+        "📍 " + item.distance.toFixed(1) + " km";
 
       const lien = carte.querySelector(
         'a[href*="/annuaire-entreprises/"]'
@@ -1119,15 +1067,13 @@ if (!blocRegion) {
 
         bouton.type = "button";
         bouton.className =
-          "cv-prox-page" +
-          (actif ? " active" : "");
+          "cv-prox-page" + (actif ? " active" : "");
 
         bouton.textContent = label;
         bouton.disabled = actif;
 
         bouton.addEventListener("click", () => {
           pageCourante = numero;
-
           afficherResultats();
 
           ui.bloc.scrollIntoView({
@@ -1169,19 +1115,15 @@ if (!blocRegion) {
     statut(
       resultats.length +
       " entreprise(s) trouvée(s) dans un rayon de " +
-      ui.rayon.value +
-      " km."
+      ui.rayon.value + " km."
     );
   }
 
-  // ============================================================
-  // RECHERCHE PRINCIPALE
-  // ============================================================
+  // ==================================================
+  // RECHERCHE
+  // ==================================================
 
-  async function rechercher(
-    centre,
-    enregistrer = true
-  ) {
+  async function rechercher(centre, enregistrer = true) {
     if (rechercheEnCours) return;
 
     verrouiller(true);
@@ -1191,12 +1133,9 @@ if (!blocRegion) {
     try {
       const rayon = Number(ui.rayon.value);
 
-      statut(
-        "Chargement des données géographiques..."
-      );
+      statut("Chargement des données géographiques...");
 
       const adherents = await chargerAdherents();
-
       const filtres = obtenirParametresNatifs();
 
       const cartes = await chargerToutesLesCartes(
@@ -1248,14 +1187,11 @@ if (!blocRegion) {
     }
   }
 
-  // ============================================================
+  // ==================================================
   // EVENEMENTS
-  // ============================================================
+  // ==================================================
 
   function brancherEvenements() {
-
-    // CHANGEMENT DE MODE
-
     ui.mode.querySelectorAll(
       'input[name="cv-mode"]'
     ).forEach(input => {
@@ -1264,27 +1200,21 @@ if (!blocRegion) {
       });
     });
 
-    // AUTOUR DE MOI
-
     ui.geoloc.addEventListener("click", async () => {
       if (rechercheEnCours) return;
 
       try {
         statut("Localisation en cours...");
 
-        const centre =
-          await obtenirPositionNavigateur();
+        const centre = await obtenirPositionNavigateur();
 
         ui.ville.value = "Ma position actuelle";
-
         await rechercher(centre);
 
       } catch (erreur) {
         statut(erreur.message, true);
       }
     });
-
-    // RECHERCHE VILLE
 
     ui.search.addEventListener("click", async () => {
       if (rechercheEnCours) return;
@@ -1299,10 +1229,8 @@ if (!blocRegion) {
           position
         ) {
           centre = position;
-
         } else {
           statut("Recherche de la commune...");
-
           centre = await geocoderVille(valeur);
         }
 
@@ -1313,8 +1241,6 @@ if (!blocRegion) {
       }
     });
 
-    // ENTREE DANS LE CHAMP VILLE
-
     ui.ville.addEventListener("keydown", e => {
       if (e.key === "Enter") {
         e.preventDefault();
@@ -1322,12 +1248,8 @@ if (!blocRegion) {
       }
     });
 
-    // REINITIALISATION
-
     ui.reset.addEventListener("click", () => {
       if (rechercheEnCours) return;
-
-      effacerEtat();
 
       position = null;
       resultats = [];
@@ -1338,15 +1260,16 @@ if (!blocRegion) {
 
       restaurerResultatsNatifs();
 
-      statut("Filtre de proximité désactivé.");
-
       enregistrerEtat({
         mode: "proximite",
         active: false
       });
+
+      statut("Filtre de proximité désactivé.");
     });
 
-    // SOUMISSION DU FORMULAIRE EVENTMAKER
+    // Empêcher la soumission classique
+    // uniquement en mode proximité.
 
     formulaire.addEventListener("submit", e => {
       if (mode !== "proximite") return;
@@ -1374,9 +1297,9 @@ if (!blocRegion) {
     });
   }
 
-  // ============================================================
+  // ==================================================
   // INITIALISATION
-  // ============================================================
+  // ==================================================
 
   async function initialiser() {
     try {
@@ -1389,9 +1312,7 @@ if (!blocRegion) {
       }
 
       ajouterStyles();
-
       ui = creerInterface();
-
       brancherEvenements();
 
       const etat = lireEtat();
@@ -1417,13 +1338,12 @@ if (!blocRegion) {
         if (etat.active && position) {
           await rechercher(position, false);
         }
-
       } else {
         changerModeRecherche("classique");
       }
 
       console.log(
-        "Filtre proximité Cosmetic Valley initialisé.",
+        "Filtre proximité Cosmetic Valley initialisé :",
         mode
       );
 
@@ -1435,9 +1355,11 @@ if (!blocRegion) {
     }
   }
 
-  // ============================================================
+  // ==================================================
   // DEMARRAGE
-  // ============================================================
+  // ==================================================
+
+  window.__cvProximiteInitialise = true;
 
   if (document.readyState === "loading") {
     document.addEventListener(
