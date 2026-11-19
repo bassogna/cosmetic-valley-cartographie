@@ -336,12 +336,7 @@
   // ============================================================
 
   function obtenirConfiguration() {
-    const flowUrl = (
-      prompt(
-        "Colle l'URL HTTP POST de ton flux Power Automate :",
-        sessionStorage.getItem("cv_flow_url") || ""
-      ) || ""
-    ).trim();
+    const urlFlow = window.URL_FLOW;
 
     if (!flowUrl) {
       throw new Error("URL Power Automate absente.");
