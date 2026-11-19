@@ -350,9 +350,15 @@
       '_search_options[company_dpt_region_level_1]"]'
     );
 
-    blocRegion = regionInput?.closest(
-      ".hierarchical-guest-fields-select"
-    ) || null;
+  blocRegion = regionInput?.closest(
+  ".hierarchical-guest-fields-select"
+) || null;
+
+if (!blocRegion) {
+  blocRegion = document.querySelector(
+    ".hierarchical-guest-fields-select"
+  );
+}
 
     if (blocRegion) {
       affichageRegion = blocRegion.style.display;
@@ -507,10 +513,12 @@
     const proximite = mode === "proximite";
 
     if (blocRegion) {
-      blocRegion.style.display = proximite
-        ? "none"
-        : affichageRegion;
-    }
+  blocRegion.style.setProperty(
+    "display",
+    proximite ? "none" : (affichageRegion || ""),
+    proximite ? "important" : ""
+  );
+}
 
     ui.bloc.style.display = proximite
       ? "block"
