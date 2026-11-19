@@ -16,7 +16,7 @@
     concurrence: 4,
     pageSize: 20,
 
-    stockage: "cv_proximite_v7"
+    stockage: "cv_proximite_v8"
   };
 
   if (window.__cvProximiteInitialise) return;
@@ -40,7 +40,7 @@
 
   let boutonsNatifs = [];
 
-  let paginationNative = new Map();
+  const paginationNative = new Map();
 
   let cacheAdherents = null;
 
@@ -152,7 +152,9 @@
 
     style.textContent = `
 
-      /* MODES */
+      /* ==========================================
+         SELECTEUR DE MODE
+         ========================================== */
 
       #cv-mode-recherche {
         margin: 15px 0 20px;
@@ -187,7 +189,9 @@
         accent-color: #70358d;
       }
 
-      /* PROXIMITE */
+      /* ==========================================
+         FILTRES DE PROXIMITE
+         ========================================== */
 
       #cv-proximite {
         display: none;
@@ -221,6 +225,7 @@
         border: 1px solid #ccc;
         border-radius: 6px;
         background: white;
+        color: #292929;
         font-size: 15px;
       }
 
@@ -255,7 +260,9 @@
         cursor: wait;
       }
 
-      /* PROGRESSION */
+      /* ==========================================
+         BARRE DE PROGRESSION
+         ========================================== */
 
       #cv-prox-progress {
         display: none;
@@ -290,31 +297,71 @@
         line-height: 1.5;
       }
 
-      /* RESULTATS NATIFS */
+      /* ==========================================
+         RESULTATS GPS
+         ========================================== */
 
       #cv-prox-results {
+        width: 100%;
         margin: 0;
         padding: 0;
       }
 
+      /*
+       * Grille Flexbox.
+       * Conservation des largeurs Bootstrap Eventmaker.
+       * Suppression des flottements responsables
+       * des décalages verticaux.
+       */
+
       #cv-prox-results .cv-prox-grid {
-        margin: 0;
+        display: flex !important;
+        flex-wrap: wrap;
+        align-items: stretch;
+        align-content: flex-start;
+        row-gap: 20px;
+        margin-left: -15px;
+        margin-right: -15px;
       }
+
+      #cv-prox-results .cv-prox-grid > .guest-item {
+        float: none !important;
+        clear: none !important;
+        display: flex;
+        flex-direction: column;
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+        min-width: 0;
+      }
+
+      #cv-prox-results .cv-prox-grid > .guest-item > a {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+      }
+
+      /* Conservation des logos natifs */
 
       #cv-prox-results .guest-item img {
         max-width: 100%;
         object-fit: contain;
       }
 
-      .cv-prox-distance {
+      /* Distance */
+
+      #cv-prox-results .cv-prox-distance {
+        margin-top: auto;
+        padding-top: 8px;
+        text-align: center;
         color: #70358d;
         font-size: 12px;
         font-weight: bold;
-        text-align: center;
-        margin: 7px 0;
       }
 
-      /* PAGINATION STYLE EVENTMAKER */
+      /* ==========================================
+         PAGINATION GPS
+         ========================================== */
 
       #cv-prox-pagination {
         display: flex;
@@ -322,7 +369,7 @@
         align-items: center;
         gap: 6px;
         flex-wrap: wrap;
-        margin: 35px 0;
+        margin: 30px 0;
         padding: 0;
         list-style: none;
       }
@@ -333,12 +380,12 @@
         padding: 0;
       }
 
-      .cv-prox-page {
-        display: flex;
+      #cv-prox-pagination .cv-prox-page {
+        display: inline-flex;
         justify-content: center;
         align-items: center;
-        min-width: 30px;
-        height: 30px;
+        min-width: 28px;
+        height: 28px;
         padding: 5px 9px;
         border: 0;
         border-radius: 50%;
@@ -348,28 +395,36 @@
         cursor: pointer;
       }
 
-      .cv-prox-page.active {
+      #cv-prox-pagination .cv-prox-page.active {
         background: #c52f63;
         color: white;
       }
 
-      .cv-prox-page:hover:not(:disabled) {
+      #cv-prox-pagination .cv-prox-page:hover:not(:disabled) {
         background: #70358d;
         color: white;
       }
 
-      .cv-prox-page:disabled {
+      #cv-prox-pagination .cv-prox-page:disabled {
         cursor: default;
       }
 
-      /* PAGINATION GPS SEULEMENT */
+      /* ==========================================
+         MASQUAGE PAGINATION EVENTMAKER
+         ========================================== */
 
       body.cv-proximite-active
-      #cv-prox-pagination {
-        display: flex;
+      ul:has(a[href*="guests_list_916095_page="]):not(#cv-prox-pagination),
+      body.cv-proximite-active
+      nav:has(a[href*="guests_list_916095_page="]):not(#cv-prox-pagination),
+      body.cv-proximite-active
+      .pagination:has(a[href*="guests_list_916095_page="]) {
+        display: none !important;
       }
 
-      /* MOBILE */
+      /* ==========================================
+         MOBILE
+         ========================================== */
 
       @media(max-width:650px) {
 
@@ -423,7 +478,9 @@
       affichageRegion = blocRegion.style.display;
     }
 
+    // ----------------------------------------------------------
     // MODES
+    // ----------------------------------------------------------
 
     const selecteurMode = document.createElement("div");
 
@@ -456,1202 +513,8 @@
       </div>
     `;
 
-    // PROXIMITE
-
-    const bloc = document.createElement("div");
-
-    bloc.id = "cv-proximite";
-
-    bloc.innerHTML = `
-      <div class="cv-prox-fields">
-
-        <div class="cv-prox-field">
-          <label for="cv-prox-ville">
-            Ville ou code postal
-          </label>
-
-          <input
-            id="cv-prox-ville"
-            type="text"
-            placeholder="Ex. Chartres ou 28000"
-            autocomplete="off">
-        </div>
-
-        <div class="cv-prox-field">
-          <label for="cv-prox-rayon">
-            Rayon de recherche
-          </label>
-
-          <select id="cv-prox-rayon">
-            <option value="10">10 km</option>
-            <option value="25">25 km</option>
-            <option value="50" selected>50 km</option>
-            <option value="100">100 km</option>
-            <option value="200">200 km</option>
-          </select>
-        </div>
-
-      </div>
-
-      <div class="cv-prox-buttons">
-
-        <button
-          type="button"
-          id="cv-prox-geoloc"
-          class="cv-prox-btn cv-prox-location">
-          📍 Autour de moi
-        </button>
-
-        <button
-          type="button"
-          id="cv-prox-reset"
-          class="cv-prox-btn cv-prox-reset">
-          Réinitialiser
-        </button>
-
-      </div>
-
-      <div id="cv-prox-progress">
-
-        <div class="cv-prox-progress-track">
-          <div id="cv-prox-progress-bar"></div>
-        </div>
-
-        <div id="cv-prox-progress-text"></div>
-
-      </div>
-
-      <div
-        id="cv-prox-status"
-        role="status"
-        aria-live="polite">
-      </div>
-    `;
-
-    // Insertion dans la zone des filtres
-
-    formulaire.insertAdjacentElement(
-      "beforebegin",
-      selecteurMode
-    );
-
-    if (blocRegion) {
-      blocRegion.insertAdjacentElement(
-        "afterend",
-        bloc
-      );
-    } else {
-      formulaire.appendChild(bloc);
-    }
-
-    boutonsNatifs = [
-      ...formulaire.querySelectorAll(
-        'button[type="submit"], input[type="submit"]'
-      )
-    ].filter(b => !b.closest("#cv-proximite"));
-
-    return {
-      mode: selecteurMode,
-      bloc,
-
-      ville: bloc.querySelector("#cv-prox-ville"),
-      rayon: bloc.querySelector("#cv-prox-rayon"),
-
-      geoloc: bloc.querySelector("#cv-prox-geoloc"),
-      reset: bloc.querySelector("#cv-prox-reset"),
-
-      status: bloc.querySelector("#cv-prox-status"),
-
-      progress: bloc.querySelector("#cv-prox-progress"),
-      progressBar: bloc.querySelector("#cv-prox-progress-bar"),
-      progressText: bloc.querySelector("#cv-prox-progress-text")
-    };
-  }
-
-  // ============================================================
-  // STATUT ET PROGRESSION
-  // ============================================================
-
-  function statut(message, erreur = false) {
-    ui.status.textContent = message;
-
-    ui.status.style.color =
-      erreur ? "#b42318" : "#555";
-  }
-
-  function progression(pourcentage, message) {
-    ui.progress.style.display = "block";
-
-    const valeur = Math.max(
-      0,
-      Math.min(100, pourcentage)
-    );
-
-    ui.progressBar.style.width =
-      valeur + "%";
-
-    ui.progressText.textContent =
-      message + " (" + Math.round(valeur) + " %)";
-  }
-
-  function masquerProgression() {
-    ui.progress.style.display = "none";
-    ui.progressBar.style.width = "0%";
-  }
-
-  function verrouiller(etat) {
-    rechercheEnCours = etat;
-
-    ui.geoloc.disabled = etat;
-    ui.reset.disabled = etat;
-
-    boutonsNatifs.forEach(b => {
-      b.disabled = etat;
-    });
-  }
-
-  // ============================================================
-  // PAGINATION NATIVE
-  // ============================================================
-
-  function gererPaginationNative(masquer) {
-    const liens = [
-      ...document.querySelectorAll(
-        'a[href*="' + CONFIG.pageParam + '="]'
-      )
-    ].filter(a =>
-      !a.closest("#cv-prox-results")
-    );
-
-    const conteneurs = new Set();
-
-    liens.forEach(lien => {
-      const bloc = lien.closest(
-        ".pagination, .pagination-wrapper, nav, ul"
-      ) || lien.parentElement;
-
-      if (bloc) {
-        conteneurs.add(bloc);
-      }
-    });
-
-    conteneurs.forEach(bloc => {
-      if (masquer) {
-        if (!paginationNative.has(bloc)) {
-          paginationNative.set(bloc, {
-            display: bloc.style.getPropertyValue("display"),
-            priority: bloc.style.getPropertyPriority("display")
-          });
-        }
-
-        bloc.style.setProperty(
-          "display",
-          "none",
-          "important"
-        );
-      }
-    });
-
-    if (!masquer) {
-      paginationNative.forEach((ancien, bloc) => {
-        if (!bloc.isConnected) return;
-
-        if (ancien.display) {
-          bloc.style.setProperty(
-            "display",
-            ancien.display,
-            ancien.priority
-          );
-        } else {
-          bloc.style.removeProperty("display");
-        }
-      });
-
-      paginationNative.clear();
-    }
-  }
-
-  // ============================================================
-  // MODES
-  // ============================================================
-
-  function changerModeRecherche(nouveauMode) {
-    mode = nouveauMode;
-
-    const proximite = mode === "proximite";
-
-    document.body.classList.toggle(
-      "cv-proximite-active",
-      proximite
-    );
-
-    if (blocRegion) {
-      if (proximite) {
-        blocRegion.style.setProperty(
-          "display",
-          "none",
-          "important"
-        );
-      } else {
-        blocRegion.style.removeProperty("display");
-
-        if (affichageRegion) {
-          blocRegion.style.display = affichageRegion;
-        }
-      }
-    }
-
-    ui.bloc.style.display =
-      proximite ? "block" : "none";
-
-    gererPaginationNative(proximite);
-
-    if (!proximite) {
-      ++requeteCourante;
-      restaurerResultatsNatifs();
-      masquerProgression();
-    }
-
-    const ancien = lireEtat() || {};
-
-    enregistrerEtat({
-      ...ancien,
-      mode,
-      active: proximite && !!position && !!ancien.active
-    });
-  }
-
-  // ============================================================
-  // GEOLOCALISATION
-  // ============================================================
-
-  function obtenirPositionNavigateur() {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error(
-          "Géolocalisation indisponible."
-        ));
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        p => resolve({
-          latitude: p.coords.latitude,
-          longitude: p.coords.longitude
-        }),
-
-        erreur => {
-          const messages = {
-            1: "Autorisation de localisation refusée.",
-            2: "Position géographique indisponible.",
-            3: "Délai de localisation dépassé."
-          };
-
-          reject(new Error(
-            messages[erreur.code] ||
-            "Impossible d'obtenir votre position."
-          ));
-        },
-
-        {
-          enableHighAccuracy: false,
-          timeout: 15000,
-          maximumAge: 60000
-        }
-      );
-    });
-  }
-
-  // ============================================================
-  // GEOCODAGE VILLE / CODE POSTAL
-  // ============================================================
-
-  async function geocoderVille(valeur) {
-    const recherche = valeur.trim();
-
-    if (!recherche) {
-      throw new Error(
-        "Saisissez une ville ou un code postal."
-      );
-    }
-
-    const params = new URLSearchParams({
-      fields: "centre,codesPostaux",
-      format: "json",
-      limit: "10"
-    });
-
-    if (/^[0-9]{5}$/.test(recherche)) {
-      params.set("codePostal", recherche);
-    } else {
-      params.set("nom", recherche);
-    }
-
-    const response = await fetch(
-      "https://geo.api.gouv.fr/communes?" +
-      params.toString()
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        "Service de recherche des villes indisponible."
-      );
-    }
-
-    const communes = await response.json();
-
-    if (!Array.isArray(communes) || !communes.length) {
-      throw new Error("Aucune commune trouvée.");
-    }
-
-    const exacte = communes.find(c =>
-      normaliser(c.nom) === normaliser(recherche)
-    );
-
-    const commune = exacte || communes[0];
-
-    if (!commune.centre?.coordinates) {
-      throw new Error(
-        "Coordonnées de la commune indisponibles."
-      );
-    }
-
-    return {
-      latitude: commune.centre.coordinates[1],
-      longitude: commune.centre.coordinates[0],
-      nom: commune.nom,
-      codePostal: commune.codesPostaux?.[0] || ""
-    };
-  }
-
-  // ============================================================
-  // GEOCODAGE INVERSE
-  // ============================================================
-
-  async function identifierVille(positionGPS) {
-    try {
-      const url =
-        "https://api-adresse.data.gouv.fr/reverse/?" +
-        new URLSearchParams({
-          lon: positionGPS.longitude,
-          lat: positionGPS.latitude
-        });
-
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error("Géocodage inverse indisponible");
-      }
-
-      const json = await response.json();
-
-      const properties =
-        json.features?.[0]?.properties;
-
-      if (!properties) return "";
-
-      const ville = properties.city || "";
-      const codePostal = properties.postcode || "";
-
-      return [
-        ville,
-        codePostal ? "(" + codePostal + ")" : ""
-      ].filter(Boolean).join(" ");
-
-    } catch {
-      return "";
-    }
-  }
-
-  // ============================================================
-  // JSON GITHUB
-  // ============================================================
-
-  async function chargerAdherents() {
-    if (cacheAdherents) {
-      return cacheAdherents;
-    }
-
-    const response = await fetch(
-      CONFIG.dataUrl + "?v=" + Date.now(),
-      { cache: "no-store" }
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        "Impossible de charger les adhérents."
-      );
-    }
-
-    const json = await response.json();
-
-    const source = Array.isArray(json)
-      ? json
-      : json.adherents;
-
-    if (!Array.isArray(source)) {
-      throw new Error("Format JSON incorrect.");
-    }
-
-    cacheAdherents = source.filter(a =>
-      a.url &&
-      a.latitude !== null &&
-      a.latitude !== "" &&
-      a.longitude !== null &&
-      a.longitude !== "" &&
-      Number.isFinite(Number(a.latitude)) &&
-      Number.isFinite(Number(a.longitude))
-    );
-
-    return cacheAdherents;
-  }
-
-  // ============================================================
-  // FILTRES EVENTMAKER
-  // ============================================================
-
-  function obtenirParametresNatifs() {
-    const params = new URLSearchParams();
-
-    const data = new FormData(formulaire);
-
-    for (const [cle, valeur] of data.entries()) {
-      if (
-        typeof valeur === "string" &&
-        cle.startsWith(CONFIG.prefix)
-      ) {
-        params.append(cle, valeur);
-      }
-    }
-
-    params.delete(
-      CONFIG.prefix +
-      "_search_options[company_dpt_region_level_1]"
-    );
-
-    params.delete(
-      CONFIG.prefix +
-      "_search_options[company_dpt_region_level_2]"
-    );
-
-    params.delete(CONFIG.pageParam);
-
-    return params;
-  }
-
-  // ============================================================
-  // PAGES EVENTMAKER
-  // ============================================================
-
-  function urlPage(numero, filtres) {
-    const url = new URL(
-      formulaire.action || location.pathname,
-      location.origin
-    );
-
-    url.hash = "";
-    url.search = filtres.toString();
-
-    url.searchParams.set(
-      CONFIG.pageParam,
-      String(numero)
-    );
-
-    return url.href;
-  }
-
-  function nombrePages(doc) {
-    let maximum = 1;
-
-    doc.querySelectorAll(
-      'a[href*="' + CONFIG.pageParam + '="]'
-    ).forEach(a => {
-      try {
-        const url = new URL(a.href, location.origin);
-
-        const n = Number(
-          url.searchParams.get(CONFIG.pageParam)
-        );
-
-        if (Number.isInteger(n) && n > maximum) {
-          maximum = n;
-        }
-      } catch {}
-    });
-
-    return maximum;
-  }
-
-  async function chargerPage(numero, filtres) {
-    const response = await fetch(
-      urlPage(numero, filtres),
-      {
-        credentials: "same-origin",
-        cache: "no-store"
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        "Erreur Eventmaker page " +
-        numero +
-        " : HTTP " +
-        response.status
-      );
-    }
-
-    const html = await response.text();
-
-    const doc = new DOMParser().parseFromString(
-      html,
-      "text/html"
-    );
-
-    return {
-      doc,
-      cartes: [
-        ...doc.querySelectorAll(".guest-item")
-      ]
-    };
-  }
-
-  async function chargerToutesLesCartes(filtres) {
-    progression(5, "Préparation de la recherche");
-
-    const premiere = await chargerPage(1, filtres);
-
-    const totalPages = nombrePages(premiere.doc);
-
-    if (totalPages > CONFIG.maxPages) {
-      throw new Error(
-        "Nombre de pages supérieur à la limite."
-      );
-    }
-
-    const pages = new Array(totalPages);
-    pages[0] = premiere.cartes;
-
-    let prochainePage = 2;
-    let terminees = 1;
-
-    progression(
-      10 + 75 * terminees / totalPages,
-      "Recherche des entreprises"
-    );
-
-    async function travailleur() {
-      while (prochainePage <= totalPages) {
-        const numero = prochainePage++;
-
-        const resultat = await chargerPage(
-          numero,
-          filtres
-        );
-
-        pages[numero - 1] = resultat.cartes;
-        terminees++;
-
-        progression(
-          10 + 75 * terminees / totalPages,
-          "Recherche des entreprises"
-        );
-      }
-    }
-
-    await Promise.all(
-      Array.from(
-        {
-          length: Math.min(
-            CONFIG.concurrence,
-            Math.max(0, totalPages - 1)
-          )
-        },
-        () => travailleur()
-      )
-    );
-
-    return pages.flat();
-  }
-
-  // ============================================================
-  // FILTRAGE GEOGRAPHIQUE
-  // ============================================================
-
-  function filtrerParDistance(
-    cartes,
-    adherents,
-    centre,
-    rayon
-  ) {
-    const index = new Map();
-
-    adherents.forEach(a => {
-      const slug = slugDepuisUrl(a.url);
-
-      if (slug) {
-        index.set(slug, a);
-      }
-    });
-
-    const dejaVus = new Set();
-    const selection = [];
-
-    cartes.forEach(carte => {
-      const lien = carte.querySelector(
-        'a[href*="/annuaire-entreprises/"]'
-      );
-
-      if (!lien) return;
-
-      const slug = slugDepuisUrl(lien.href);
-      const adherent = index.get(slug);
-
-      if (!adherent || dejaVus.has(slug)) {
-        return;
-      }
-
-      const distance = distanceKm(
-        centre.latitude,
-        centre.longitude,
-        Number(adherent.latitude),
-        Number(adherent.longitude)
-      );
-
-      if (distance <= rayon) {
-        dejaVus.add(slug);
-
-        selection.push({
-          carte,
-          adherent,
-          distance
-        });
-      }
-    });
-
-    selection.sort(
-      (a, b) => a.distance - b.distance
-    );
-
-    return selection;
-  }
-
-  // ============================================================
-  // LOGOS EVENTMAKER
-  // ============================================================
-
-  function restaurerImages(carte) {
-    carte.querySelectorAll("img").forEach(img => {
-      const source =
-        img.getAttribute("data-original") ||
-        img.getAttribute("data-lazy-src") ||
-        img.getAttribute("data-src") ||
-        img.getAttribute("src");
-
-      const srcset =
-        img.getAttribute("data-srcset") ||
-        img.getAttribute("srcset");
-
-      if (source) {
-        img.setAttribute("src", source);
-      }
-
-      if (srcset) {
-        img.setAttribute("srcset", srcset);
-      }
-
-      img.removeAttribute("data-src");
-      img.removeAttribute("data-original");
-      img.removeAttribute("data-lazy-src");
-      img.removeAttribute("data-srcset");
-
-      img.loading = "eager";
-
-      img.classList.remove(
-        "lazyload",
-        "lazyloading"
-      );
-
-      img.classList.add("lazyloaded");
-
-      img.style.visibility = "visible";
-      img.style.opacity = "1";
-
-      img.onerror = function () {
-        this.style.display = "none";
-      };
-
-      if (!source && !srcset) {
-        img.style.display = "none";
-      }
-    });
-  }
-
-  // ============================================================
-  // RESULTATS NATIFS
-  // ============================================================
-
-  function masquerResultatsNatifs() {
-    if (conteneurNatif) {
-      gererPaginationNative(true);
-      return;
-    }
-
-    conteneurNatif = trouverConteneur(document);
-
-    if (!conteneurNatif) {
-      throw new Error(
-        "Conteneur des fiches introuvable."
-      );
-    }
-
-    affichageNatif = conteneurNatif.style.display;
-
-    conteneurNatif.style.display = "none";
-
-    gererPaginationNative(true);
-  }
-
-  function restaurerResultatsNatifs() {
-    if (conteneurNatif) {
-      conteneurNatif.style.display =
-        affichageNatif || "";
-
-      conteneurNatif = null;
-    }
-
-    document.getElementById(
-      "cv-prox-results"
-    )?.remove();
-
-    gererPaginationNative(false);
-  }
-
-  // ============================================================
-  // AFFICHAGE RESULTATS
-  // ============================================================
-
-  function afficherResultats() {
-    if (mode !== "proximite") return;
-
-    masquerResultatsNatifs();
-
-    let conteneur = document.getElementById(
-      "cv-prox-results"
-    );
-
-    if (!conteneur) {
-      conteneur = document.createElement("div");
-      conteneur.id = "cv-prox-results";
-
-      conteneurNatif.insertAdjacentElement(
-        "afterend",
-        conteneur
-      );
-    }
-
-    conteneur.innerHTML = "";
-
-    const debut =
-      (pageCourante - 1) * CONFIG.pageSize;
-
-    const page = resultats.slice(
-      debut,
-      debut + CONFIG.pageSize
-    );
-
-    // Même classe de grille que le conteneur natif.
-    const grille = document.createElement("div");
-
-    grille.className =
-      conteneurNatif.className || "row";
-
-    grille.classList.add("cv-prox-grid");
-
-    page.forEach(item => {
-      const carte = item.carte.cloneNode(true);
-
-      restaurerImages(carte);
-
-      const badge = document.createElement("div");
-      badge.className = "cv-prox-distance";
-
-      badge.textContent =
-        "📍 " + item.distance.toFixed(1) + " km";
-
-      const lien = carte.querySelector(
-        'a[href*="/annuaire-entreprises/"]'
-      );
-
-      if (lien) {
-        lien.appendChild(badge);
-      }
-
-      grille.appendChild(carte);
-    });
-
-    conteneur.appendChild(grille);
-
-    if (!resultats.length) {
-      const vide = document.createElement("p");
-
-      vide.textContent =
-        "Aucune entreprise trouvée dans ce rayon.";
-
-      conteneur.appendChild(vide);
-    }
-
-    // ========================================================
-    // PAGINATION GPS
-    // ========================================================
-
-    const totalPages = Math.ceil(
-      resultats.length / CONFIG.pageSize
-    );
-
-    if (totalPages > 1) {
-      const navigation = document.createElement("ul");
-
-      navigation.id = "cv-prox-pagination";
-
-      function ajouterBouton(label, numero, actif) {
-        const li = document.createElement("li");
-        const bouton = document.createElement("button");
-
-        bouton.type = "button";
-
-        bouton.className =
-          "cv-prox-page" +
-          (actif ? " active" : "");
-
-        bouton.textContent = label;
-        bouton.disabled = actif;
-
-        bouton.addEventListener("click", () => {
-          pageCourante = numero;
-          afficherResultats();
-
-          ui.bloc.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-          });
-        });
-
-        li.appendChild(bouton);
-        navigation.appendChild(li);
-      }
-
-      if (pageCourante > 1) {
-        ajouterBouton(
-          "Précédent",
-          pageCourante - 1,
-          false
-        );
-      }
-
-      for (let i = 1; i <= totalPages; i++) {
-        ajouterBouton(
-          String(i),
-          i,
-          i === pageCourante
-        );
-      }
-
-      if (pageCourante < totalPages) {
-        ajouterBouton(
-          "Suivant",
-          pageCourante + 1,
-          false
-        );
-      }
-
-      conteneur.appendChild(navigation);
-    }
-
-    statut(
-      resultats.length +
-      " entreprise(s) trouvée(s) dans un rayon de " +
-      ui.rayon.value +
-      " km."
-    );
-  }
-
-  // ============================================================
-  // RECHERCHE PRINCIPALE
-  // ============================================================
-
-  async function rechercher(centre, enregistrer = true) {
-    if (rechercheEnCours) return;
-
-    verrouiller(true);
-
-    const numeroRequete = ++requeteCourante;
-
-    try {
-      progression(3, "Chargement des données");
-
-      const adherents = await chargerAdherents();
-
-      const filtres = obtenirParametresNatifs();
-
-      const cartes = await chargerToutesLesCartes(
-        filtres
-      );
-
-      progression(90, "Calcul des distances");
-
-      const selection = filtrerParDistance(
-        cartes,
-        adherents,
-        centre,
-        Number(ui.rayon.value)
-      );
-
-      if (
-        numeroRequete !== requeteCourante ||
-        mode !== "proximite"
-      ) {
-        return;
-      }
-
-      resultats = selection;
-      pageCourante = 1;
-      position = centre;
-
-      if (enregistrer) {
-        enregistrerEtat({
-          mode: "proximite",
-          centre,
-          rayon: Number(ui.rayon.value),
-          ville: ui.ville.value,
-          active: true
-        });
-      }
-
-      progression(100, "Recherche terminée");
-
-      afficherResultats();
-
-      setTimeout(() => {
-        masquerProgression();
-      }, 700);
-
-    } catch (erreur) {
-      console.error(
-        "Filtre proximité Cosmetic Valley :",
-        erreur
-      );
-
-      masquerProgression();
-      statut(erreur.message, true);
-
-    } finally {
-      verrouiller(false);
-    }
-  }
-
-  // ============================================================
-  // RECHERCHE DEPUIS LE BOUTON NATIF
-  // ============================================================
-
-  async function lancerRechercheProximite() {
-    if (rechercheEnCours) return;
-
-    try {
-      const valeur = ui.ville.value.trim();
-
-      let centre;
-
-      if (
-        position &&
-        valeur === position.libelle
-      ) {
-        centre = position;
-
-      } else {
-        statut("Recherche de la commune...");
-
-        centre = await geocoderVille(valeur);
-
-        centre.libelle =
-          centre.nom +
-          (centre.codePostal
-            ? " (" + centre.codePostal + ")"
-            : "");
-
-        ui.ville.value = centre.libelle;
-      }
-
-      await rechercher(centre);
-
-    } catch (erreur) {
-      statut(erreur.message, true);
-    }
-  }
-
-  // ============================================================
-  // EVENEMENTS
-  // ============================================================
-
-  function brancherEvenements() {
-    ui.mode.querySelectorAll(
-      'input[name="cv-mode"]'
-    ).forEach(input => {
-      input.addEventListener("change", () => {
-        changerModeRecherche(input.value);
-      });
-    });
-
-    // AUTOUR DE MOI
-
-    ui.geoloc.addEventListener("click", async () => {
-      if (rechercheEnCours) return;
-
-      try {
-        statut("Localisation en cours...");
-
-        const centre =
-          await obtenirPositionNavigateur();
-
-        const ville =
-          await identifierVille(centre);
-
-        centre.libelle = ville ||
-          "Ma position actuelle (" +
-          centre.latitude.toFixed(4) + ", " +
-          centre.longitude.toFixed(4) + ")";
-
-        ui.ville.value = centre.libelle;
-
-        await rechercher(centre);
-
-      } catch (erreur) {
-        statut(erreur.message, true);
-      }
-    });
-
-    // ENTREE DANS VILLE
-
-    ui.ville.addEventListener("keydown", e => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        lancerRechercheProximite();
-      }
-    });
-
-    // REINITIALISATION
-
-    ui.reset.addEventListener("click", () => {
-      if (rechercheEnCours) return;
-
-      position = null;
-      resultats = [];
-      pageCourante = 1;
-
-      ui.ville.value = "";
-      ui.rayon.value = "50";
-
-      restaurerResultatsNatifs();
-      masquerProgression();
-
-      enregistrerEtat({
-        mode: "proximite",
-        active: false
-      });
-
-      statut("Filtre de proximité désactivé.");
-    });
-
-    // BOUTON RECHERCHER EVENTMAKER
-
-    formulaire.addEventListener(
-      "submit",
-      e => {
-        if (mode !== "proximite") return;
-
-        e.preventDefault();
-        e.stopPropagation();
-
-        lancerRechercheProximite();
-      },
-      true
-    );
-  }
-
-  // ============================================================
-  // INITIALISATION
-  // ============================================================
-
-  async function initialiser() {
-    try {
-      formulaire = trouverFormulaire();
-
-      if (!formulaire) {
-        throw new Error(
-          "Formulaire Eventmaker introuvable."
-        );
-      }
-
-      ajouterStyles();
-
-      ui = creerInterface();
-
-      brancherEvenements();
-
-      const etat = lireEtat();
-
-      if (etat?.mode === "proximite") {
-        ui.mode.querySelector(
-          'input[value="proximite"]'
-        ).checked = true;
-
-        ui.ville.value = etat.ville || "";
-        ui.rayon.value = String(etat.rayon || 50);
-
-        if (
-          etat.centre &&
-          Number.isFinite(Number(etat.centre.latitude)) &&
-          Number.isFinite(Number(etat.centre.longitude))
-        ) {
-          position = etat.centre;
-        }
-
-        changerModeRecherche("proximite");
-
-        if (etat.active && position) {
-          await rechercher(position, false);
-        }
-
-      } else {
-        changerModeRecherche("classique");
-      }
-
-      window.__cvProximiteInitialise = true;
-
-      console.log(
-        "Filtre proximité Cosmetic Valley initialisé :",
-        mode
-      );
-
-    } catch (erreur) {
-      console.error(
-        "Initialisation filtre proximité :",
-        erreur
-      );
-    }
-  }
-
-  // ============================================================
-  // DEMARRAGE
-  // ============================================================
-
-  if (document.readyState === "loading") {
-    document.addEventListener(
-      "DOMContentLoaded",
-      initialiser,
-      { once: true }
-    );
-  } else {
-    initialiser();
-  }
-
-})();
+    // ----------------------------------------------------------
+    // CHAMPS GPS
+    // ----------------------------------------------------------
+
+    const bloc = document.createElement
