@@ -1463,6 +1463,61 @@
     }
   }
 
+  // ==================================================
+// SURVEILLANCE DU FORMULAIRE EVENTMAKER
+// ==================================================
+
+let reinitialisationProgrammee = false;
+
+const observateur = new MutationObserver(() => {
+
+  if (reinitialisationProgrammee) return;
+
+  const nouveauFormulaire = trouverFormulaire();
+
+  if (!nouveauFormulaire) return;
+
+  const boutonMode = document.getElementById(
+    "cv-mode-recherche"
+  );
+
+  const blocProximite = document.getElementById(
+    "cv-proximite"
+  );
+
+  if (!boutonMode || !blocProximite) {
+
+    reinitialisationProgrammee = true;
+
+    setTimeout(() => {
+
+      observateur.disconnect();
+
+      // Autoriser la réinitialisation du script
+      window.__cvProximiteInitialise = false;
+
+      // Supprimer les éventuels éléments restants
+      document.getElementById(
+        "cv-mode-recherche"
+      )?.remove();
+
+      document.getElementById(
+        "cv-proximite"
+      )?.remove();
+
+      // Recharger la page pour reconstruire proprement
+      // le formulaire et notre interface
+      location.reload();
+
+    }, 300);
+  }
+});
+
+observateur.observe(document.body, {
+  childList: true,
+  subtree: true
+});
+  
   // ============================================================
   // DEMARRAGE
   // ============================================================
