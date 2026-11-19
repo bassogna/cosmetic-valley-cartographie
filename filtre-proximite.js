@@ -1768,7 +1768,42 @@
       );
     }
   }
+function personnaliserPlaceholders() {
 
+  const champs = [
+    {
+      name: "company_dpt_region_level_1",
+      texte: "Choisissez une région"
+    },
+    {
+      name: "company_dpt_region_level_2",
+      texte: "Choisissez un département"
+    }
+  ];
+
+  champs.forEach(champ => {
+
+    const input = document.querySelector(
+      `input[name*="${champ.name}"]`
+    );
+
+    if (!input) return;
+
+    const conteneur = input.closest(".react-select");
+
+    if (!conteneur) return;
+
+    const placeholder = conteneur.querySelector(
+      '[class*="placeholder"]'
+    );
+
+    if (placeholder) {
+      placeholder.textContent = champ.texte;
+    }
+
+  });
+
+}
   // ============================================================
   // DEMARRAGE
   // ============================================================
